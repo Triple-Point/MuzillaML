@@ -4,7 +4,7 @@ import yaml
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import KFold
 
-from data.DataUtils import load_data, split_user, csr_to_torch_sparse_tensor, normalize_sparse_tensor
+from data.DataUtils import split_user, csr_to_torch_sparse_tensor, normalize_sparse_tensor, load_or_create
 from src.models.cosine_model import CosineModel
 from src.models.tfidf_model import TFIDFModel
 
@@ -24,7 +24,7 @@ def main(config_file):
     config = load_config(config_file)
 
     # If no processed data, create it
-    user_artist_matrix = load_data(config['data']['raw_data'])
+    user_artist_matrix = load_or_create(config['data']['raw_data'], config['data']['processed_data'])
 
     model_type = config['model']['model']
     if model_type == 'cosine_model':
@@ -32,7 +32,7 @@ def main(config_file):
     elif model_type == 'tfidf_model':
         model_class = TFIDFModel
     else:
-        raise ValueError("model must be defined in configuration file")
+        raise ValueError("model must be defined in configuration file:\nmodel:\n\tmodel: [cosine_model|tfidf_model]")
 
     # 10-fold Cross validation
     kf = KFold(n_splits=10, shuffle=True, random_state=42)

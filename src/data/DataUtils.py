@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import pandas as pd
 import torch
@@ -17,13 +18,18 @@ def load_data(data_file):
     return sparse_matrix
 
 
-def load_or_create(raw_data_file, sparse_data_file, force_reprosess=False):
+def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
     # (Re)create the sparse matrix
-    if force_reprosess or not os.path.isfile(sparse_data_file):
+    if force_reprocess or not os.path.isfile(sparse_data_file):
         sparse_matrix = load_data(raw_data_file)
+        with open(sparse_data_file, "wb") as f:
+            pickle.dump(sparse_matrix, f)
     else:
-        # TODO: implement this properly
-        sparse_matrix = sparse_data_file.load()
+        # Load the sparse matrix using pickle
+        with open("matrix.pkl", "rb") as f:
+            sparse_matrix = pickle.load(f)
+    return sparse_matrix
+
 
 
 def split_user(input_matrix):
@@ -68,9 +74,9 @@ def normalize_sparse_tensor(sparse_tensor):
     # Create a diagonal sparse tensor for normalization
     row_norms_inv = 1.0 / row_norms
     row_indices = torch.arange(row_norms.size(0), device=row_norms.device)
-    diag_indices = torch.stack([row_indices, row_indices])
-    diag_values = row_norms_inv
-    norm_diag = torch.sparse_coo_tensor(diag_indices, diag_values, size=(row_norms.size(0), row_norms.size(0)))
+    diagonal_indices = torch.stack([row_indices, row_indices])
+    diagonal_values = row_norms_inv
+    norm_diagonal = torch.sparse_coo_tensor(diagonal_indices, diagonal_values, size=(row_norms.size(0), row_norms.size(0)))
 
     # Normalize rows of the sparse tensor
-    return torch.sparse.mm(norm_diag, sparse_tensor)
+    return torch.sparse.mm(norm_diagonal, sparse_tensor)
