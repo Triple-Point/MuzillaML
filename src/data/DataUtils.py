@@ -1,8 +1,8 @@
 import os
 
 import pandas as pd
+import torch
 from scipy.sparse import csr_matrix
-import numpy as np
 
 
 def load_data(data_file):
@@ -48,3 +48,29 @@ def split_user(input_matrix):
     output_matrix_1 = output_matrix_1.tocsr()
     output_matrix_2 = output_matrix_2.tocsr()
     return output_matrix_1, output_matrix_2
+
+
+# Convert csr_matrix to PyTorch sparse tensor
+def csr_to_torch_sparse_tensor(csr_mat):
+    coo = csr_mat.tocoo()  # Convert to COO format
+    indices = torch.tensor([coo.row, coo.col], dtype=torch.long)
+    values = torch.tensor(coo.data, dtype=torch.float32)
+    shape = coo.shape
+    return torch.sparse_coo_tensor(indices, values, size=shape)
+
+
+# Normalize sparse tensor row-wise
+def normalize_sparse_tensor(sparse_tensor):
+    # Compute L2 norm of each row
+    row_norms = torch.sqrt(torch.sparse.sum(sparse_tensor.pow(2), dim=1).to_dense())
+    row_norms = torch.where(row_norms == 0, torch.tensor(1.0, device=row_norms.device), row_norms)  # Avoid div by zero
+
+    # Create a diagonal sparse tensor for normalization
+    row_norms_inv = 1.0 / row_norms
+    row_indices = torch.arange(row_norms.size(0), device=row_norms.device)
+    diag_indices = torch.stack([row_indices, row_indices])
+    diag_values = row_norms_inv
+    norm_diag = torch.sparse_coo_tensor(diag_indices, diag_values, size=(row_norms.size(0), row_norms.size(0)))
+
+    # Normalize rows of the sparse tensor
+    return torch.sparse.mm(norm_diag, sparse_tensor)
