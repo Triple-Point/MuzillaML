@@ -26,10 +26,9 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
             pickle.dump(sparse_matrix, f)
     else:
         # Load the sparse matrix using pickle
-        with open("matrix.pkl", "rb") as f:
+        with open(sparse_data_file, "rb") as f:
             sparse_matrix = pickle.load(f)
     return sparse_matrix
-
 
 
 def split_user(input_matrix):
