@@ -1,9 +1,10 @@
 import os
 import pickle
-
+import numpy as np
 import pandas as pd
 import torch
 from scipy.sparse import csr_matrix
+from PIL import Image
 
 
 def load_data(data_file):
@@ -79,3 +80,27 @@ def normalize_sparse_tensor(sparse_tensor):
 
     # Normalize rows of the sparse tensor
     return torch.sparse.mm(norm_diagonal, sparse_tensor)
+
+
+def dump_to_file(user_artist_matrix, out_file_name, show_image=False):
+    # Sum the rows and columns
+    row_sums = user_artist_matrix.sum(axis=1).A1  # Summing rows
+    col_sums = user_artist_matrix.sum(axis=0).A1  # Summing columns
+    # Get the sorted indices
+    sorted_row_indices = np.argsort(-row_sums)  # Sort descending
+    sorted_col_indices = np.argsort(-col_sums)  # Sort descending
+    # Reorder the matrix
+    sorted_matrix = user_artist_matrix[:][:, sorted_col_indices]
+    # Create a new image with the dimensions of the sorted matrix
+    # TODO: This takes too much memory. Must be optimised
+    img = Image.new('1', (sorted_matrix.shape[1], sorted_matrix.shape[0]))  # 1-bit pixels, black and white
+    # Process row by row
+    for i, sorted_row_index in enumerate(sorted_row_indices):
+        row = sorted_matrix.getrow(sorted_row_index)
+        for j in range(row.indices.size):
+            img.putpixel((row.indices[j], i), 1)  # Set black pixel for non-zero entry
+    # Save the image
+    img.save(out_file_name)
+    # Show the image (optional)
+    if show_image:
+        img.show()

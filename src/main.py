@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import KFold
 
 from data.DataUtils import split_user, csr_to_torch_sparse_tensor, normalize_sparse_tensor, load_or_create
+from src.data.DataUtils import dump_to_file
 from src.models.cosine_model import CosineModel
 from src.models.tfidf_model import TFIDFModel
 
@@ -26,6 +27,11 @@ def main(config_file):
     # If no processed data, create it
     user_artist_matrix = load_or_create(config['data']['raw_data'], config['data']['processed_data'])
 
+    # Dump matrix to a PNG file
+    if config['data']['image_dump']:
+        dump_to_file(user_artist_matrix, config['data']['image_dump'])
+
+    # TODO: Factory?
     model_type = config['model']['model']
     if model_type == 'cosine_model':
         model_class = CosineModel
@@ -71,7 +77,6 @@ def main(config_file):
             total_score += (target_score - score)
 
         print(f"{total_score=}")
-
 
 
 if __name__ == "__main__":
