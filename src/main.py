@@ -3,7 +3,7 @@ import argparse
 import yaml
 from sklearn.model_selection import KFold
 
-from data.DataUtils import split_user, csr_to_torch_sparse_tensor, normalize_sparse_tensor, load_or_create
+from data.DataUtils import split_user, normalize_sparse_tensor, load_or_create
 from src.data.DataUtils import dump_to_file
 from src.models.cosine_model import CosineModel
 from src.models.tfidf_model import TFIDFModel
@@ -42,14 +42,14 @@ def main(config_file):
     # 10-fold Cross validation
     kf = KFold(n_splits=10, shuffle=True, random_state=42)
 
+    # TODO: I don't think this is doing what I want. Try out on a smaller dataset...
     for train_index, test_index in kf.split(user_artist_matrix):
-        train_matrix = user_artist_matrix[train_index]
         test_matrix = user_artist_matrix[test_index]
 
         train_tensor = user_artist_matrix[train_index]
 
         # Convert to PyTorch sparse tensors and move to GPU
-        train_tensor = csr_to_torch_sparse_tensor(train_tensor).to('cuda')
+        train_tensor = train_tensor.to('cuda')
         train_tensor = normalize_sparse_tensor(train_tensor)
 
         # Make a model on the train data
@@ -62,15 +62,15 @@ def main(config_file):
             # TODO: Batch some of this to save time
             set1, set2 = split_user(user)
 
-            set1_tensor = normalize_sparse_tensor(csr_to_torch_sparse_tensor(set1).to('cuda'))
+            set1_tensor = normalize_sparse_tensor(set1.to('cuda'))
 
             # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
             new_artist = model.recommend_artist(set1_tensor)
-            total_score += user[new_artist] > 0
+            total_score += new_artist in user.indices
 
-            set2_tensor = normalize_sparse_tensor(csr_to_torch_sparse_tensor(set2).to('cuda'))
-            new_artist = model.recommend_artist(set1_tensor)
-            total_score += user[new_artist] > 0
+            set2_tensor = normalize_sparse_tensor(set2.to('cuda'))
+            new_artist = model.recommend_artist(set2_tensor)
+            total_score += new_artist in user.indices
 
         print(f"{total_score=}")
 

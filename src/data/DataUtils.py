@@ -1,22 +1,30 @@
 import os
 import pickle
-import numpy as np
 import pandas as pd
-import torch
+import numpy as np
 from scipy.sparse import csr_matrix
 from PIL import Image
+import torch
+from torch import Tensor
 
 
-def load_data(data_file):
+def load_data(data_file: str) -> torch.Tensor:
     data = pd.read_csv(data_file)
     data.columns = ['user_id', 'artist_id', 'album_count']
-    # Pivot the dataset to get a matrix form
-    # pivot_table = data.pivot(index='user_id', columns='artist_id', values='count').fillna(0)
+
+    # Convert user_id and artist_id to categorical codes
     row = data['user_id'].astype('category').cat.codes
     col = data['artist_id'].astype('category').cat.codes
-    sparse_matrix = csr_matrix((data['album_count'], (row, col)),
-                               shape=(len(data['user_id'].unique()), len(data['artist_id'].unique())))
-    return sparse_matrix
+    album_count = data['album_count'].values
+
+    # Create a COO sparse tensor
+    indices = torch.tensor([row, col], dtype=torch.long)
+    values = torch.tensor(album_count, dtype=torch.float32)
+    shape = (len(data['user_id'].unique()), len(data['artist_id'].unique()))
+
+    sparse_tensor = torch.sparse_coo_tensor(indices, values, size=shape)
+    return sparse_tensor
+
 
 
 def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
@@ -32,7 +40,8 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
     return sparse_matrix
 
 
-def split_user(input_matrix):
+def split_user(input_matrix: Tensor):
+    # TODO: Turn into sparse tensor
     # Initialize output matrices with the same shape as the input
     output_matrix_1 = csr_matrix(input_matrix.shape)
     output_matrix_2 = csr_matrix(input_matrix.shape)
@@ -42,7 +51,7 @@ def split_user(input_matrix):
 
     # Alternate assignment to the two matrices
     toggle = True
-    for i, j, v in zip(input_coo.row, input_coo.col, input_coo.data):
+    for i, j, v in zip(input_matrix.row, input_matrix.col, input_matrix.data):
         if v != 0:
             if toggle:
                 output_matrix_1[i, j] = v
@@ -51,20 +60,7 @@ def split_user(input_matrix):
             toggle = not toggle
 
     # Convert back to CSR format if needed
-    output_matrix_1 = output_matrix_1.tocsr()
-    output_matrix_2 = output_matrix_2.tocsr()
     return output_matrix_1, output_matrix_2
-
-
-# Convert csr_matrix to PyTorch sparse tensor
-def csr_to_torch_sparse_tensor(csr_mat: csr_matrix):
-    # TODO: Creating a tensor from a list of numpy.ndarrays is extremely slow.
-    #  Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor.
-    coo = csr_mat.tocoo()  # Convert to COO format
-    indices = torch.tensor([coo.row, coo.col], dtype=torch.long)
-    values = torch.tensor(coo.data, dtype=torch.float32)
-    shape = coo.shape
-    return torch.sparse_coo_tensor(indices, values, size=shape)
 
 
 # Normalize sparse tensor row-wise
