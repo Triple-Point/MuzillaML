@@ -18,3 +18,13 @@ class RecommenderModel(ABC):
         :return: Index of the most similar user
         """
         pass
+
+    @abstractmethod
+    def recommend_artist(self, user):
+        """
+        Compute and return the index of a new artist for the given user.
+
+        :param user: Index or identifier of the user
+        :return: Index of the most similar user
+        """
+        pass
