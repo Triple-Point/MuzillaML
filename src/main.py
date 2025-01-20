@@ -1,7 +1,6 @@
 import argparse
 
 import yaml
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import KFold
 
 from data.DataUtils import split_user, csr_to_torch_sparse_tensor, normalize_sparse_tensor, load_or_create
@@ -66,15 +65,12 @@ def main(config_file):
             set1_tensor = normalize_sparse_tensor(csr_to_torch_sparse_tensor(set1).to('cuda'))
 
             # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
-            peer, score = model.get_similar_user_index(set1_tensor)
-            target_score = cosine_similarity(user, train_matrix[peer]).flatten()
-            total_score += (target_score - score)
+            new_artist = model.recommend_artist(set1_tensor)
+            total_score += user[new_artist] > 0
 
             set2_tensor = normalize_sparse_tensor(csr_to_torch_sparse_tensor(set2).to('cuda'))
-
-            peer, score = model.get_similar_user_index(set2_tensor)
-            target_score = cosine_similarity(user, train_matrix[peer]).flatten()
-            total_score += (target_score - score)
+            new_artist = model.recommend_artist(set1_tensor)
+            total_score += user[new_artist] > 0
 
         print(f"{total_score=}")
 
