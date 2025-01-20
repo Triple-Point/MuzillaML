@@ -57,7 +57,9 @@ def split_user(input_matrix):
 
 
 # Convert csr_matrix to PyTorch sparse tensor
-def csr_to_torch_sparse_tensor(csr_mat):
+def csr_to_torch_sparse_tensor(csr_mat: csr_matrix):
+    # TODO: Creating a tensor from a list of numpy.ndarrays is extremely slow.
+    #  Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor.
     coo = csr_mat.tocoo()  # Convert to COO format
     indices = torch.tensor([coo.row, coo.col], dtype=torch.long)
     values = torch.tensor(coo.data, dtype=torch.float32)
