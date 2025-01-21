@@ -5,6 +5,7 @@ import logging
 
 from torch import Tensor
 
+from src.data.DataUtils import normalize_sparse_tensor, copy_and_remove_values
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -40,8 +41,8 @@ class CosineModel(RecommenderModel):
 
         most_similar_user_index = np.argmax(cosine_sim)
         similarity_value = cosine_sim[most_similar_user_index]
-        logger.info(f"Cosine Similarities {cosine_sim.shape}:\n{cosine_sim}")
-        logger.info(f"{most_similar_user_index=}\t{similarity_value=}")
+        logger.debug(f"Cosine Similarities {cosine_sim.shape}:\n{cosine_sim}")
+        logger.debug(f"{most_similar_user_index=}\t{similarity_value=}")
         return most_similar_user_index, similarity_value
 
     def recommend_artist(self, user: Tensor) -> int:
@@ -70,3 +71,19 @@ class CosineModel(RecommenderModel):
 
         logger.info(f"Largest remaining value in vector 2: {largest_value}")
         return artist_idx
+
+
+    def evaluate(self, users):
+        # For each user in the test set
+        total_score = 0
+        for user in users:
+            for i in range(0, 2):
+                # TODO: Batch some of this to save time
+                filtered_user = copy_and_remove_values(user, offset=i)
+
+                filtered_user = normalize_sparse_tensor(filtered_user.to('cuda'))
+
+                # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
+                new_artist = self.recommend_artist(filtered_user)
+                total_score += new_artist in user.indices
+        return total_score
