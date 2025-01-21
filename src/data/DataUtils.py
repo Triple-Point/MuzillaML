@@ -1,30 +1,43 @@
+import logging
 import os
 import pickle
 import pandas as pd
 import numpy as np
-from scipy.sparse import csr_matrix
 from PIL import Image
-import torch
 from torch import Tensor
+import torch
+from sklearn.model_selection import KFold
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def load_data(data_file: str) -> torch.Tensor:
+def load_data(data_file: str, device: torch.device = torch.device("cpu")) -> torch.Tensor:
+    # Load the data
+    logger.info(f"(Re)Loading and processing the data")
     data = pd.read_csv(data_file)
     data.columns = ['user_id', 'artist_id', 'album_count']
 
     # Convert user_id and artist_id to categorical codes
-    row = data['user_id'].astype('category').cat.codes
-    col = data['artist_id'].astype('category').cat.codes
-    album_count = data['album_count'].values
+    row = torch.tensor(data['user_id'].astype('category').cat.codes, dtype=torch.int64, device=device)
+    col = torch.tensor(data['artist_id'].astype('category').cat.codes, dtype=torch.int64, device=device)
+    values = torch.tensor(data['album_count'].values, dtype=torch.float32, device=device)
 
-    # Create a COO sparse tensor
-    indices = torch.tensor([row, col], dtype=torch.long)
-    values = torch.tensor(album_count, dtype=torch.float32)
-    shape = (len(data['user_id'].unique()), len(data['artist_id'].unique()))
+    # Determine the shape of the sparse tensor
+    num_rows = row.max().item() + 1
+    num_cols = col.max().item() + 1
 
-    sparse_tensor = torch.sparse_coo_tensor(indices, values, size=shape)
-    return sparse_tensor
+    logger.info(f"Making COO tensor")
+    # Create COO sparse tensor
+    coo_tensor = torch.sparse_coo_tensor(
+        indices=torch.stack([row, col]),
+        values=values,
+        size=(num_rows, num_cols),
+        device=device
+    )
 
+    logger.info(f"Calling COO coalesce")
+    return coo_tensor.coalesce()
 
 
 def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
@@ -40,27 +53,27 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
     return sparse_matrix
 
 
-def split_user(input_matrix: Tensor):
-    # TODO: Turn into sparse tensor
-    # Initialize output matrices with the same shape as the input
-    output_matrix_1 = csr_matrix(input_matrix.shape)
-    output_matrix_2 = csr_matrix(input_matrix.shape)
+def copy_and_remove_values(sparse_tensor, offset=0, stride=2):
+    # Deep copy the sparse tensor
+    sparse_copy = torch.sparse_coo_tensor(
+        sparse_tensor.indices(),
+        sparse_tensor.values().clone(),
+        sparse_tensor.size()
+    ).coalesce()
 
-    # Convert the input matrix to a COOrdinate format for easy iteration
-    input_coo = input_matrix.tocoo()
+    # Modify every second non-zero value to zero
+    modified_values = sparse_copy.values().clone()
+    non_zero_indices = torch.arange(len(modified_values))  # Indices of non-zero values
+    modified_values[non_zero_indices[offset::stride]] = 0  # Set every second non-zero value to zero
 
-    # Alternate assignment to the two matrices
-    toggle = True
-    for i, j, v in zip(input_matrix.row, input_matrix.col, input_matrix.data):
-        if v != 0:
-            if toggle:
-                output_matrix_1[i, j] = v
-            else:
-                output_matrix_2[i, j] = v
-            toggle = not toggle
+    # Create the updated sparse tensor
+    updated_sparse_tensor = torch.sparse_coo_tensor(
+        sparse_copy.indices(),
+        modified_values,
+        sparse_copy.size()
+    )
 
-    # Convert back to CSR format if needed
-    return output_matrix_1, output_matrix_2
+    return updated_sparse_tensor
 
 
 # Normalize sparse tensor row-wise
@@ -102,3 +115,79 @@ def dump_to_file(user_artist_matrix, out_file_name, show_image=False):
     # Show the image (optional)
     if show_image:
         img.show()
+
+
+def cross_validate(user_artist_matrix, n_splits=10, random_state=42):
+    """
+    Perform 10-fold cross-validation on a PyTorch sparse COO tensor.
+
+    Args:
+        user_artist_matrix (torch.Tensor): Sparse COO tensor of shape (num_users, num_artists).
+        n_splits (int): Number of splits for cross-validation.
+        random_state (int): Seed for shuffling rows.
+
+    Yields:
+        train_matrix (torch.Tensor): Sparse COO tensor for training data.
+        test_matrix (torch.Tensor): Sparse COO tensor for test data.
+    """
+    # Get unique rows (users)
+    row_indices = user_artist_matrix.indices()[0]
+    unique_rows = torch.unique(row_indices)
+
+    # Generate splits
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    for train_idx, test_idx in kf.split(unique_rows):
+        # Split rows into training and testing sets
+        train_rows = unique_rows[train_idx]
+        test_rows = unique_rows[test_idx]
+
+        # Create masks for training and testing
+        train_mask = torch.isin(row_indices, train_rows)
+        test_mask = torch.isin(row_indices, test_rows)
+
+        # Extract train and test matrices using masks
+        train_matrix = torch.sparse_coo_tensor(
+            indices=user_artist_matrix.indices()[:, train_mask],
+            values=user_artist_matrix.values()[train_mask],
+            size=user_artist_matrix.size()
+        )
+
+        test_matrix = torch.sparse_coo_tensor(
+            indices=user_artist_matrix.indices()[:, test_mask],
+            values=user_artist_matrix.values()[test_mask],
+            size=user_artist_matrix.size()
+        )
+
+        yield train_matrix, test_matrix
+
+
+# Convert list of ints to torch.sparse_coo_tensor
+def list_to_sparse_coo(int_list, shape):
+    # Reshape the list into a dense matrix
+    dense_matrix = torch.tensor(int_list).reshape(shape)
+
+    # Find indices of non-zero elements
+    indices = dense_matrix.nonzero(as_tuple=True)
+
+    # Get the values at these indices
+    values = dense_matrix[indices]
+
+    # Create a sparse tensor
+    sparse_tensor = torch.sparse_coo_tensor(
+        torch.stack(indices),
+        values,
+        size=shape
+    )
+    return sparse_tensor.coalesce()
+
+
+if __name__ == "__main__":
+    # Run some tests
+    test_matrix = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
+    expected_result_offset0 = [0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 0]
+    actual_result = copy_and_remove_values(list_to_sparse_coo(test_matrix, (1, len(test_matrix))))
+    assert(expected_result_offset0==actual_result.to_dense().flatten().tolist())
+
+    expected_result_offset1 = [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0]
+    actual_result = copy_and_remove_values(list_to_sparse_coo(test_matrix, (1, len(test_matrix))), offset=1)
+    assert(expected_result_offset1==actual_result.to_dense().flatten().tolist())
