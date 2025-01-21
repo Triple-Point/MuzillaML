@@ -3,7 +3,7 @@ import argparse
 import yaml
 from sklearn.model_selection import KFold
 
-from data.DataUtils import split_user, normalize_sparse_tensor, load_or_create
+from data.DataUtils import normalize_sparse_tensor, load_or_create, cross_validate
 from src.data.DataUtils import dump_to_file
 from src.models.cosine_model import CosineModel
 from src.models.tfidf_model import TFIDFModel
@@ -27,7 +27,7 @@ def main(config_file):
     user_artist_matrix = load_or_create(config['data']['raw_data'], config['data']['processed_data'])
 
     # Dump matrix to a PNG file
-    if config['data']['image_dump']:
+    if 'image_dump' in config['data'] and config['data']['image_dump']:
         dump_to_file(user_artist_matrix, config['data']['image_dump'])
 
     # TODO: Factory?
@@ -39,40 +39,19 @@ def main(config_file):
     else:
         raise ValueError("model must be defined in configuration file:\nmodel:\n\tmodel: [cosine_model|tfidf_model]")
 
-    # 10-fold Cross validation
-    kf = KFold(n_splits=10, shuffle=True, random_state=42)
-
-    # TODO: I don't think this is doing what I want. Try out on a smaller dataset...
-    for train_index, test_index in kf.split(user_artist_matrix):
-        test_matrix = user_artist_matrix[test_index]
-
-        train_tensor = user_artist_matrix[train_index]
-
-        # Convert to PyTorch sparse tensors and move to GPU
-        train_tensor = train_tensor.to('cuda')
-        train_tensor = normalize_sparse_tensor(train_tensor)
+    eval_scores = []
+    for train_tensor, test_tensor in cross_validate(user_artist_matrix):
+        # TODO: Pre-normalize these in the cross_validate function
+        #  Convert to PyTorch sparse tensors and move to GPU
+        train_tensor = normalize_sparse_tensor(train_tensor).to('cuda')
+        test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
 
         # Make a model on the train data
         model = model_class(train_tensor)
 
-        total_score = 0
+        eval_scores.append(model.evaluate(test_tensor))
 
-        # For each user in the test set
-        for user in test_matrix:
-            # TODO: Batch some of this to save time
-            set1, set2 = split_user(user)
-
-            set1_tensor = normalize_sparse_tensor(set1.to('cuda'))
-
-            # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
-            new_artist = model.recommend_artist(set1_tensor)
-            total_score += new_artist in user.indices
-
-            set2_tensor = normalize_sparse_tensor(set2.to('cuda'))
-            new_artist = model.recommend_artist(set2_tensor)
-            total_score += new_artist in user.indices
-
-        print(f"{total_score=}")
+    print(f"{eval_scores=}")
 
 
 if __name__ == "__main__":

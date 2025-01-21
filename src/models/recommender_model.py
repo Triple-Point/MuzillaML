@@ -28,3 +28,13 @@ class RecommenderModel(ABC):
         :return: Index of the most similar user
         """
         pass
+
+    @abstractmethod
+    def evaluate(self, user):
+        """
+        Compute and return the quality of the model on the test set.
+
+        :param user: Index or identifier of the user
+        :return: Evaluation score
+        """
+        pass
