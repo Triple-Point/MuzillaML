@@ -1,12 +1,15 @@
 import argparse
+import logging
 
 import yaml
-from sklearn.model_selection import KFold
-
 from data.DataUtils import normalize_sparse_tensor, load_or_create, cross_validate
 from src.data.DataUtils import dump_to_file
 from src.models.cosine_model import CosineModel
 from src.models.tfidf_model import TFIDFModel
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def load_config(config_file):
@@ -41,14 +44,8 @@ def main(config_file):
 
     eval_scores = []
     for train_tensor, test_tensor in cross_validate(user_artist_matrix):
-        # TODO: Pre-normalize these in the cross_validate function
-        #  Convert to PyTorch sparse tensors and move to GPU
-        train_tensor = normalize_sparse_tensor(train_tensor).to('cuda')
-        test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
-
         # Make a model on the train data
         model = model_class(train_tensor)
-
         eval_scores.append(model.evaluate(test_tensor))
 
     print(f"{eval_scores=}")

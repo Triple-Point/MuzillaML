@@ -5,7 +5,7 @@ import logging
 
 from torch import Tensor
 
-from src.data.DataUtils import normalize_sparse_tensor, copy_and_remove_values
+from src.data.DataUtils import normalize_sparse_tensor, mask_artists
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class CosineModel(RecommenderModel):
-    def __init__(self, sparse_data):
-        super().__init__(sparse_data)
+    def __init__(self, data):
+        super().__init__(data)
 
     def sparse_cosine_similarity(self, norm_tensor1: Tensor) -> Tensor:
         """
@@ -73,17 +73,22 @@ class CosineModel(RecommenderModel):
         return artist_idx
 
 
-    def evaluate(self, users):
-        # For each user in the test set
+    def evaluate(self, test_tensor):
+        # TODO: Pre-normalize these in the cross_validate function
+        #  Convert to PyTorch sparse tensors and move to GPU
+        train_tensor = normalize_sparse_tensor(self.data).to('cuda')
+        test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
+
         total_score = 0
-        for user in users:
+        for user in test_tensor:
             for i in range(0, 2):
                 # TODO: Batch some of this to save time
-                filtered_user = copy_and_remove_values(user, offset=i)
-
-                filtered_user = normalize_sparse_tensor(filtered_user.to('cuda'))
-
+                masked_user = mask_artists(user, offset=i)
+                masked_user = normalize_sparse_tensor(masked_user.to('cuda'))
                 # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
-                new_artist = self.recommend_artist(filtered_user)
+                # Generate the top-1 artist
+                new_artist = self.recommend_artist(masked_user)
+                # Was it masked?
                 total_score += new_artist in user.indices
+                print(f'{total_score=}')
         return total_score

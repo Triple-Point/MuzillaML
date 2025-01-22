@@ -42,6 +42,11 @@ Excerpt below. Columns are UserID, ArtistID, AlbumCount:
 
 ## Evaluation Metrics
 
+### Top-𝑘 masked recommendation:
+ - Hide a portion of artists in the test set. Evaluate if the model can correctly predict these hidden interactions.
+ - For each user in the test set generate top-𝑘 recommendations. 
+ - Compare the recommendations with the ground truth (Masked items).
+
 ### Vectors similarity - nearest neighbour
 
 If the user is represented as a binary vector (that is, the artist is considered either present or not) several metrics are possible, including:

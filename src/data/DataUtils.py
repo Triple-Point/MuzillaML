@@ -4,7 +4,6 @@ import pickle
 import pandas as pd
 import numpy as np
 from PIL import Image
-from torch import Tensor
 import torch
 from sklearn.model_selection import KFold
 
@@ -53,7 +52,7 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
     return sparse_matrix
 
 
-def copy_and_remove_values(sparse_tensor, offset=0, stride=2):
+def mask_artists(sparse_tensor, offset=0, stride=2):
     # Deep copy the sparse tensor
     sparse_copy = torch.sparse_coo_tensor(
         sparse_tensor.indices(),
@@ -185,9 +184,9 @@ if __name__ == "__main__":
     # Run some tests
     test_matrix = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
     expected_result_offset0 = [0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 0]
-    actual_result = copy_and_remove_values(list_to_sparse_coo(test_matrix, (1, len(test_matrix))))
+    actual_result = mask_artists(list_to_sparse_coo(test_matrix, (1, len(test_matrix))))
     assert(expected_result_offset0==actual_result.to_dense().flatten().tolist())
 
     expected_result_offset1 = [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0]
-    actual_result = copy_and_remove_values(list_to_sparse_coo(test_matrix, (1, len(test_matrix))), offset=1)
+    actual_result = mask_artists(list_to_sparse_coo(test_matrix, (1, len(test_matrix))), offset=1)
     assert(expected_result_offset1==actual_result.to_dense().flatten().tolist())
