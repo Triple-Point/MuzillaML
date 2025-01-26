@@ -5,7 +5,6 @@ import logging
 
 from torch import Tensor
 
-from src.data.DataUtils import normalize_sparse_tensor, mask_artists
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -45,14 +44,21 @@ class CosineModel(RecommenderModel):
         logger.debug(f"{most_similar_user_index=}\t{similarity_value=}")
         return most_similar_user_index, similarity_value
 
-    def recommend_artist(self, user: Tensor) -> int:
+    def recommend_items(self, user: Tensor) -> int:
         """
         Recommend an artist for the user based on the most similar user's preferences.
         Args:
             user (Tensor): User tensor.
+            :param artist_count: number of recommendations to make
         Returns:
             int: Index of the recommended artist.
         """
+        # TODO: Pre-normalize these in the cross_validate function
+        #  Convert to PyTorch sparse tensors and move to GPU
+        #train_tensor = normalize_sparse_tensor(self.data).to('cuda')
+        #test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
+        #masked_user = normalize_sparse_tensor(user.to('cuda'))
+
         similar_user_index, _ = self.get_similar_user_index(user)
         similar_user = self.data[similar_user_index].flatten()
 
@@ -71,24 +77,3 @@ class CosineModel(RecommenderModel):
 
         logger.info(f"Largest remaining value in vector 2: {largest_value}")
         return artist_idx
-
-
-    def evaluate(self, test_tensor):
-        # TODO: Pre-normalize these in the cross_validate function
-        #  Convert to PyTorch sparse tensors and move to GPU
-        train_tensor = normalize_sparse_tensor(self.data).to('cuda')
-        test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
-
-        total_score = 0
-        for user in test_tensor:
-            for i in range(0, 2):
-                # TODO: Batch some of this to save time
-                masked_user = mask_artists(user, offset=i)
-                masked_user = normalize_sparse_tensor(masked_user.to('cuda'))
-                # Current assumption for KPI is that if the similarity is lower with full user data, that's a win
-                # Generate the top-1 artist
-                new_artist = self.recommend_artist(masked_user)
-                # Was it masked?
-                total_score += new_artist in user.indices
-                print(f'{total_score=}')
-        return total_score
