@@ -1,6 +1,8 @@
 import logging
 import os
 import pickle
+import random
+
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -51,28 +53,50 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
             sparse_matrix = pickle.load(f)
     return sparse_matrix
 
+# TODO: Add a seed variable so tests can be reproduced. (Also write tests)
+def remove_random_values(user_tensor, num_remove=10):
+    """
+    Remove random non-zero values from a torch.tensor.
 
-def mask_artists(sparse_tensor, offset=0, stride=2):
-    # Deep copy the sparse tensor
-    sparse_copy = torch.sparse_coo_tensor(
-        sparse_tensor.indices(),
-        sparse_tensor.values().clone(),
-        sparse_tensor.size()
-    ).coalesce()
+    Args:
+        user_tensor (torch.tensor): Input dense tensor.
+        num_remove (int): Number of random values to remove.
 
-    # Modify every second non-zero value to zero
-    modified_values = sparse_copy.values().clone()
-    non_zero_indices = torch.arange(len(modified_values))  # Indices of non-zero values
-    modified_values[non_zero_indices[offset::stride]] = 0  # Set every second non-zero value to zero
+    Returns:
+        torch.tensor: The updated dense tensor with values removed.
+        list: A sorted list of removed items in the form [(row, col, value), ...],
+              sorted by value in descending order.
+    """
+    if user_tensor.is_sparse:
+        raise ValueError("Input tensor must be dense.")
 
-    # Create the updated sparse tensor
-    updated_sparse_tensor = torch.sparse_coo_tensor(
-        sparse_copy.indices(),
-        modified_values,
-        sparse_copy.size()
-    )
+    # Find all non-zero entries
+    non_zero_indices = torch.nonzero(user_tensor, as_tuple=False)
+    non_zero_values = user_tensor[non_zero_indices[:, 0], non_zero_indices[:, 1]]
 
-    return updated_sparse_tensor
+    # Determine how many values to remove
+    actual_remove = min(num_remove, int(non_zero_values.numel() * 0.1))
+
+    # Select random indices to remove
+    if actual_remove > 0:
+        remove_indices = random.sample(range(non_zero_values.numel()), actual_remove)
+    else:
+        remove_indices = []
+
+    # Get the rows, columns, and values to be removed
+    removed_items = []
+    for idx in remove_indices:
+        row, col = non_zero_indices[idx].tolist()
+        value = user_tensor[row, col].item()
+        removed_items.append((row, col, value))
+        user_tensor[row, col] = 0  # Remove the value
+
+    # Sort removed items by value in descending order
+    removed_items = sorted(removed_items, key=lambda x: x[2], reverse=True)
+    removed_artists = [x[1] for x in removed_items]
+
+    return user_tensor, removed_artists
+
 
 
 # Normalize sparse tensor row-wise
@@ -157,7 +181,7 @@ def cross_validate(user_artist_matrix, n_splits=10, random_state=42):
             size=user_artist_matrix.size()
         )
 
-        yield train_matrix, test_matrix
+        yield train_matrix, test_matrix.coalesce()
 
 
 # Convert list of ints to torch.sparse_coo_tensor
@@ -181,12 +205,6 @@ def list_to_sparse_coo(int_list, shape):
 
 
 if __name__ == "__main__":
-    # Run some tests
-    test_matrix = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
-    expected_result_offset0 = [0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 0]
-    actual_result = mask_artists(list_to_sparse_coo(test_matrix, (1, len(test_matrix))))
-    assert(expected_result_offset0==actual_result.to_dense().flatten().tolist())
+    # TODO: Run some tests
+    pass
 
-    expected_result_offset1 = [0, 1, 0, 3, 0, 5, 0, 7, 0, 9, 0]
-    actual_result = mask_artists(list_to_sparse_coo(test_matrix, (1, len(test_matrix))), offset=1)
-    assert(expected_result_offset1==actual_result.to_dense().flatten().tolist())
