@@ -9,9 +9,14 @@ python main --config [path to config.yaml]
     data:
         raw_data: [path to the latest Musilla data]
 
+    model:
+        model: [cosine_model|tfidf_model|popularity_model|random_model]
+
 ## Project description
 
-The goal of the project is to recommend a new artist to an existing user, given their current collection of albums. 
+The goal of the project evaluate recommendation models for the Muzilla task.
+That is given a list of users, artists and album counts, can we recommend a new artist that the user would be interested in?  
+
 
 ## Data description
 
@@ -32,6 +37,10 @@ Excerpt below. Columns are UserID, ArtistID, AlbumCount:
     51815,61121,2
     51815,882847,2
 
+There are approx. 400k users, 500k artists, and 60M entries.
+
+This format makes it trivial to read into a Sparce COO Matrix.
+
 ### Alternative datasets
 
 - The Audioscrobbler data set contains profiles for users and a play count of artists that each user listens to.
@@ -46,6 +55,45 @@ Excerpt below. Columns are UserID, ArtistID, AlbumCount:
  - Hide a portion of artists in the test set. Evaluate if the model can correctly predict these hidden interactions.
  - For each user in the test set generate top-𝑘 recommendations. 
  - Compare the recommendations with the ground truth (Masked items).
+
+ - The code currently uses a default of 10
+
+### Mean Average Precision (MAP)
+
+Assuming order is important, MAP seems like a good metric to use.
+The model generates the top-𝑘 and compares this to 𝑘 masked artists.
+
+### Results
+
+#### Baseline
+The random_model generates a list of 𝑘 randomly selected artists.
+
+10-fold cross validation resulted in MAP of [ 
+2.07 
+0.83
+7.63
+1.06
+0.60
+1.22
+1.24
+2.53
+0.83
+0.0] * 10^-6
+
+...or basically zero.
+
+#### Popularity mode
+
+The popularity model calculates the most popular artists, and recommends them.
+
+Not optimised for time, so I stopped before cross validation was done. Converged on an average MAP score of: 0.002827381577617915
+Better than chance. w00t!!!
+
+
+
+### Serendipity 
+
+TDB. This is actually an important part of the Muzilla philosophy, but this is hard to define ;)
 
 ### Vectors similarity - nearest neighbour
 
