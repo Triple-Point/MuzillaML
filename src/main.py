@@ -2,13 +2,9 @@ import argparse
 import logging
 
 import yaml
-from data.DataUtils import normalize_sparse_tensor, load_or_create, cross_validate, remove_random_values
-from src.data.DataUtils import dump_to_file
+from data.DataUtils import load_or_create, remove_random_values
+from src.data.DataUtils import dump_to_image
 from src.metrics.MeanAveragePrecision import mean_average_precision
-from src.models.cosine_model import CosineModel
-from src.models.popularity_model import PopularityModel
-from src.models.random_model import RandomModel
-from src.models.tfidf_model import TFIDFModel
 # TODO: all the torch stuff needs to go somewhere else
 import torch
 
@@ -27,19 +23,20 @@ def load_config(config_file):
     except yaml.YAMLError as e:
         raise ValueError(f"Error parsing YAML file: {e}")
 
+
 def evaluate(model, test_tensor):
     total_score = 0
     i = 0
     for i, user in enumerate(get_users(test_tensor)):
-        # TODO: Batch some of this to save time
+        # TODO: Batch some of this to save time?
         masked_user, masked_artists = remove_random_values(user)
         # Generate the top-n artists
         new_artist_list = model.recommend_items(masked_user, len(masked_artists))
         total_score += mean_average_precision(new_artist_list, masked_artists)
-        average_score = total_score / (i+1)
+        average_score = total_score / (i + 1)
         logger.info(f'{i=}\t{total_score=}\t{average_score=}')
     print(f"Tested users {i} in the set of size {test_tensor.size()}")
-    return total_score/(i+1)
+    return total_score / (i + 1)
 
 
 def distribute_sparse_tensor(sparse_tensor, num_buckets=10):
@@ -92,8 +89,6 @@ def concatenate_except_one(sub_tensors, excluded_index):
     for i, tensor in enumerate(sub_tensors):
         if i == excluded_index:
             continue
-        if tensor._nnz() == 0:  # Skip empty tensors
-            continue
 
         # Offset row indices by the current total_rows
         indices = tensor.indices()
@@ -119,6 +114,7 @@ def concatenate_except_one(sub_tensors, excluded_index):
 
     return concatenated_tensor.coalesce()
 
+
 def get_users(sparse_tensor):
     # Iterate over each unique user ID
     unique_user_ids = torch.unique(sparse_tensor.indices()[0])
@@ -138,29 +134,33 @@ def get_users(sparse_tensor):
         yield user_dense
 
 
-
 def main(config_file):
     config = load_config(config_file)
 
     # If no processed data, create it
     user_artist_matrix = load_or_create(config['data']['raw_data'], config['data']['processed_data']).to("cuda")
 
-    # Dump matrix to a PNG file
+    # Dump matrix to a PNG file - TODO: Requires a dense representation, so memory issues here
     if 'image_dump' in config['data'] and config['data']['image_dump']:
-        dump_to_file(user_artist_matrix, config['data']['image_dump'])
+        dump_to_image(user_artist_matrix, config['data']['image_dump'])
 
     # TODO: Factory?
     model_type = config['model']['model']
     if model_type == 'cosine_model':
+        from src.models.cosine_model import CosineModel
         model_class = CosineModel
     elif model_type == 'random_model':
+        from src.models.random_model import RandomModel
         model_class = RandomModel
     elif model_type == 'tfidf_model':
+        from src.models.tfidf_model import TFIDFModel
         model_class = TFIDFModel
     elif model_type == 'popularity_model':
+        from src.models.popularity_model import PopularityModel
         model_class = PopularityModel
     else:
-        raise ValueError("model must be defined in configuration file:\nmodel:\n\tmodel: [cosine_model|tfidf_model|popularity_model|random_model]")
+        raise ValueError("model must be defined in configuration file:\nmodel:\n\tmodel: ["
+                         "cosine_model|tfidf_model|popularity_model|random_model]")
 
     eval_scores = []
     XVALID_FOLDS = 10
@@ -170,11 +170,9 @@ def main(config_file):
         logger.info(f"Starting a cross-validation batch {i}")
         train_tensor = concatenate_except_one(user_buckets, i)
         # Make a model on the train data
-        logger.info(f"Creating model")
+        logger.debug(f"Creating model")
         model = model_class(train_tensor)
-        # We do not want to use a COO matrix here, since we want to iterate over the users (maybe some matrix multiplication)
-        logger.info(f"to torch.sparse_csr_tensor")
-        logger.info(f"About to evaluate")
+        logger.debug(f"About to evaluate")
         score = evaluate(model, test_tensor)
         eval_scores.append(score)
 

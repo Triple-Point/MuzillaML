@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 import torch
-from sklearn.model_selection import KFold
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def load_data(data_file: str, device: torch.device = torch.device("cpu")) -> torch.Tensor:
     # Load the data
@@ -52,6 +52,7 @@ def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
         with open(sparse_data_file, "rb") as f:
             sparse_matrix = pickle.load(f)
     return sparse_matrix
+
 
 # TODO: Add a seed variable so tests can be reproduced. (Also write tests)
 def remove_random_values(user_tensor, num_remove=10):
@@ -98,7 +99,6 @@ def remove_random_values(user_tensor, num_remove=10):
     return user_tensor, removed_artists
 
 
-
 # Normalize sparse tensor row-wise
 def normalize_sparse_tensor(sparse_tensor):
     # Compute L2 norm of each row
@@ -110,13 +110,14 @@ def normalize_sparse_tensor(sparse_tensor):
     row_indices = torch.arange(row_norms.size(0), device=row_norms.device)
     diagonal_indices = torch.stack([row_indices, row_indices])
     diagonal_values = row_norms_inv
-    norm_diagonal = torch.sparse_coo_tensor(diagonal_indices, diagonal_values, size=(row_norms.size(0), row_norms.size(0)))
+    norm_diagonal = torch.sparse_coo_tensor(diagonal_indices, diagonal_values,
+                                            size=(row_norms.size(0), row_norms.size(0)))
 
     # Normalize rows of the sparse tensor
     return torch.sparse.mm(norm_diagonal, sparse_tensor)
 
 
-def dump_to_file(user_artist_matrix, out_file_name, show_image=False):
+def dump_to_image(user_artist_matrix, out_file_name, show_image=False):
     # Sum the rows and columns
     row_sums = user_artist_matrix.sum(axis=1).A1  # Summing rows
     col_sums = user_artist_matrix.sum(axis=0).A1  # Summing columns
@@ -140,71 +141,6 @@ def dump_to_file(user_artist_matrix, out_file_name, show_image=False):
         img.show()
 
 
-def cross_validate(user_artist_matrix, n_splits=10, random_state=42):
-    """
-    Perform 10-fold cross-validation on a PyTorch sparse COO tensor.
-
-    Args:
-        user_artist_matrix (torch.Tensor): Sparse COO tensor of shape (num_users, num_artists).
-        n_splits (int): Number of splits for cross-validation.
-        random_state (int): Seed for shuffling rows.
-
-    Yields:
-        train_matrix (torch.Tensor): Sparse COO tensor for training data.
-        test_matrix (torch.Tensor): Sparse COO tensor for test data.
-    """
-    # Get unique rows (users)
-    row_indices = user_artist_matrix.indices()[0]
-    unique_rows = torch.unique(row_indices)
-
-    # Generate splits
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    for train_idx, test_idx in kf.split(unique_rows):
-        # Split rows into training and testing sets
-        train_rows = unique_rows[train_idx]
-        test_rows = unique_rows[test_idx]
-
-        # Create masks for training and testing
-        train_mask = torch.isin(row_indices, train_rows)
-        test_mask = torch.isin(row_indices, test_rows)
-
-        # Extract train and test matrices using masks
-        train_matrix = torch.sparse_coo_tensor(
-            indices=user_artist_matrix.indices()[:, train_mask],
-            values=user_artist_matrix.values()[train_mask],
-            size=user_artist_matrix.size()
-        )
-
-        test_matrix = torch.sparse_coo_tensor(
-            indices=user_artist_matrix.indices()[:, test_mask],
-            values=user_artist_matrix.values()[test_mask],
-            size=user_artist_matrix.size()
-        )
-
-        yield train_matrix, test_matrix.coalesce()
-
-
-# Convert list of ints to torch.sparse_coo_tensor
-def list_to_sparse_coo(int_list, shape):
-    # Reshape the list into a dense matrix
-    dense_matrix = torch.tensor(int_list).reshape(shape)
-
-    # Find indices of non-zero elements
-    indices = dense_matrix.nonzero(as_tuple=True)
-
-    # Get the values at these indices
-    values = dense_matrix[indices]
-
-    # Create a sparse tensor
-    sparse_tensor = torch.sparse_coo_tensor(
-        torch.stack(indices),
-        values,
-        size=shape
-    )
-    return sparse_tensor.coalesce()
-
-
 if __name__ == "__main__":
     # TODO: Run some tests
     pass
-

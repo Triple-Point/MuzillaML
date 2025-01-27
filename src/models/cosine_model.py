@@ -2,9 +2,6 @@ from typing import Tuple
 import numpy as np
 import torch
 import logging
-
-from torch import Tensor
-
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -16,7 +13,7 @@ class CosineModel(RecommenderModel):
     def __init__(self, data):
         super().__init__(data)
 
-    def sparse_cosine_similarity(self, norm_tensor1: Tensor) -> Tensor:
+    def sparse_cosine_similarity(self, norm_tensor1: torch.Tensor) -> torch.Tensor:
         """
         Compute cosine similarity using sparse tensors.
         Args:
@@ -44,7 +41,7 @@ class CosineModel(RecommenderModel):
         logger.debug(f"{most_similar_user_index=}\t{similarity_value=}")
         return most_similar_user_index, similarity_value
 
-    def recommend_items(self, user: Tensor) -> int:
+    def recommend_items(self, user) -> int:
         """
         Recommend an artist for the user based on the most similar user's preferences.
         Args:
@@ -76,4 +73,5 @@ class CosineModel(RecommenderModel):
                 artist_idx = idx
 
         logger.info(f"Largest remaining value in vector 2: {largest_value}")
+        # TODO: Return a list
         return artist_idx

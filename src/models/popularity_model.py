@@ -1,7 +1,5 @@
 import logging
-
 import torch
-
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -23,7 +21,6 @@ class PopularityModel(RecommenderModel):
 
         # Sort items by count in descending order
         self.popularity_list = sorted_indices
-
 
     def recommend_items(self, user, topn=10):
         # Recommend the most popular items that the user hasn't seen yet.

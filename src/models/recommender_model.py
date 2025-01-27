@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+import torch
+
 
 class RecommenderModel(ABC):
-    def __init__(self, data):
+    def __init__(self, data: torch.sparse_coo_tensor):
         """
         Initialize the recommender model with the given data.
 
@@ -9,9 +11,8 @@ class RecommenderModel(ABC):
         """
         self.data = data
 
-
     @abstractmethod
-    def recommend_items(self, user, topn=10):
+    def recommend_items(self, user: torch.sparse_coo_tensor, topn=10):
         """
         Compute and return the index of a new artist for the given user.
 
