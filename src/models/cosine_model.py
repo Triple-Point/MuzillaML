@@ -1,7 +1,10 @@
-from typing import Tuple
+from typing import List, Tuple
 import numpy as np
 import torch
 import logging
+
+from src.data.DataUtils import normalize_sparse_tensor
+from src.data.TensorUtils import get_sorted_artists
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
@@ -12,66 +15,66 @@ logger = logging.getLogger(__name__)
 class CosineModel(RecommenderModel):
     def __init__(self, data):
         super().__init__(data)
+        self.device = getattr(data, "device", torch.device("cpu"))
+        # Normalize the data in prep for the cosign similarity calculation. This could take a while...
+        self.norm_data = normalize_sparse_tensor(self.data).to(self.device)
 
-    def sparse_cosine_similarity(self, norm_tensor1: torch.Tensor) -> torch.Tensor:
+    def sparse_cosine_similarity(self, norm_tensor: torch.Tensor) -> torch.Tensor:
         """
         Compute cosine similarity using sparse tensors.
         Args:
-            norm_tensor1 (Tensor): Normalized user tensor.
+            norm_tensor (Tensor): Normalized user tensor.
         Returns:
             Tensor: Cosine similarity tensor.
         """
-        return torch.sparse.mm(norm_tensor1, self.data.t())
+        return torch.sparse.mm(self.norm_data, norm_tensor.t())
 
-    def get_similar_user_index(self, user: Tensor) -> Tuple[int, float]:
+    def get_similar_users(self, user: torch.Tensor) -> Tuple[List[int], List[float]]:
         """
-        Compute the index of the most similar user based on cosine similarity.
+        Compute the indices and similarity values of the most similar users based on cosine similarity.
+
         Args:
-            user (Tensor): User tensor.
+            user (torch.Tensor): User tensor.
+
         Returns:
-            Tuple[int, float]: Index of the most similar user and similarity value.
+            Tuple[List[int], List[float]]:
+                - List of indices of the top similar users, sorted in descending order of similarity.
+                - List of corresponding similarity values, also sorted in descending order.
         """
+        # Compute cosine similarity
         cosine_sim = self.sparse_cosine_similarity(user)
         cosine_sim = cosine_sim.to_dense().cpu().numpy().flatten()
-        logger.info(cosine_sim)
 
-        most_similar_user_index = np.argmax(cosine_sim)
-        similarity_value = cosine_sim[most_similar_user_index]
-        logger.debug(f"Cosine Similarities {cosine_sim.shape}:\n{cosine_sim}")
-        logger.debug(f"{most_similar_user_index=}\t{similarity_value=}")
-        return most_similar_user_index, similarity_value
+        # Get top indices and scores sorted by similarity (descending)
+        top_indices = np.argsort(cosine_sim)[::-1]  # Indices of the top_n values
+        top_scores = cosine_sim[top_indices]  # Corresponding similarity values
 
-    def recommend_items(self, user) -> int:
+        return top_indices.tolist(), top_scores.tolist()
+
+    def recommend_items(self, user: torch.Tensor, topn: int = 10) -> List[int]:
         """
         Recommend an artist for the user based on the most similar user's preferences.
         Args:
-            user (Tensor): User tensor.
-            :param artist_count: number of recommendations to make
+            :param user: User to get recommendation for
+            :param topn: number of recommendations to make
         Returns:
-            int: Index of the recommended artist.
+            int: Sorted list of topn recommended artists.
         """
-        # TODO: Pre-normalize these in the cross_validate function
-        #  Convert to PyTorch sparse tensors and move to GPU
-        #train_tensor = normalize_sparse_tensor(self.data).to('cuda')
-        #test_tensor = normalize_sparse_tensor(test_tensor).to('cuda')
-        #masked_user = normalize_sparse_tensor(user.to('cuda'))
+        norm_user = normalize_sparse_tensor(user).to(self.device)
+        # Extract user's existing artists
+        user_artists = set(user.indices()[1].tolist())
 
-        similar_user_index, _ = self.get_similar_user_index(user)
-        similar_user = self.data[similar_user_index].flatten()
+        similar_users, _ = self.get_similar_users(norm_user)
 
-        indices_vector1 = set(user[0]._indices()[0].tolist())
-        indices_vector2 = set(similar_user._indices()[0].tolist())
+        recommendations = []
+        for similar_user in similar_users:
+            similar_artists, _ = get_sorted_artists(similar_user, self.data)
+            new_recommendations = [idx for idx in similar_artists.tolist() if idx not in user_artists]
+            recommendations.extend(new_recommendations)
+            if len(recommendations) >= topn:
+                return recommendations[:topn]
+            else:
+                user_artists |= set(new_recommendations)
 
-        unique_indices_vector2 = indices_vector2 - indices_vector1
+        raise ValueError("Unable to generate recommendations with the given inputs.")
 
-        largest_value = 0
-        artist_idx = None
-        for idx in unique_indices_vector2:
-            value = similar_user._values()[similar_user._indices()[0] == idx].item()
-            if value > largest_value:
-                largest_value = value
-                artist_idx = idx
-
-        logger.info(f"Largest remaining value in vector 2: {largest_value}")
-        # TODO: Return a list
-        return artist_idx
