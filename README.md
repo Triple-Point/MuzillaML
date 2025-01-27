@@ -63,9 +63,9 @@ This format makes it trivial to read into a Sparce COO Matrix.
 Assuming order is important, MAP seems like a good metric to use.
 The model generates the top-𝑘 and compares this to 𝑘 masked artists.
 
-### Results
+## Models
 
-#### Baseline
+### Baseline - Random recommendations
 The random_model generates a list of 𝑘 randomly selected artists.
 
 10-fold cross validation resulted in MAP of [ 
@@ -78,47 +78,58 @@ The random_model generates a list of 𝑘 randomly selected artists.
 1.24
 2.53
 0.83
-0.0] * 10^-6
+0.0] * 10<sup>-6</sup>
 
 ...or basically zero.
 
-#### Popularity model
+### Popularity model
 
 The popularity model calculates the most popular artists, and recommends them.
 
-Not optimised for time, so I stopped before cross validation was done. Converged on an average MAP score of: 0.002827381577617915
+Cross-validation MAP scores of [
+7.05, 6.79, 7.09, 6.94, 6.85, 7.13, 6.94, 7.05, 7.02, 6.68] * 10<sup>-3</sup>
+
+Average MAP score = 6.96 * 10<sup>-3</sup>
+
 Better than chance. w00t!!!
 
-#### Cosine Similarity model
+### Cosine Similarity model
 
-The Cosine Similarity finds a user with the lowest cosine angle, and selects the most popular artists from that user. If there are not enough recommendations, the next closest user is selected and so on.
+#### Vectors similarity - nearest neighbour
 
-Using 10% of the data, and using the same data set for training and testing, the MAP converges to about 0.60
-
-Cross validation results OTW
-
-### Serendipity 
-
-TDB. This is actually an important part of the Muzilla philosophy, but this is hard to define ;)
-
-### Vectors similarity - nearest neighbour
-
-If the user is represented as a binary vector (that is, the artist is considered either present or not) several metrics are possible, including:
+Several metrics are possible, including:
 
 - [Hamming Distance](https://en.wikipedia.org/wiki/Hamming_distance)
 - [Jaccard Similarity](https://en.wikipedia.org/wiki/Jaccard_index)
 - [Cosine Similarity](https://en.wikipedia.org/wiki/Cosine_similarity)
 
-Most of these are also suitable for (normalized) artist counts. 
-
-### K-nearest neighbour
+#### K-nearest neighbour
 
 [K-nearest neighbour](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 
-### Artist Candidate Selection
+The Cosine Similarity model finds a user with the lowest cosine angle, and selects the most popular artists from that user. If there are not enough recommendations, the next closest user is selected and so on.
+
+Using 10% of the data, and using the same data set for training and testing, the MAP converges to about 0.60
+
+Cross validation results 0.10
+
+#### Artist Candidate Selection
 
 Given a similar user (or multiple similar users) the candidate list can be constructed. 
 No artist in the current user's collection should appear in the recommendations. 
 
-### Artist Candidate Ranking
+#### Artist Candidate Ranking
 
+The most popular artist is ranked higher.  
+
+## Results
+
+| Model               | MAP@10 |
+|---------------------|-------|
+| Random Selection    | 0.00  |
+| Popularity Matching | 0.01  |
+| Cosine Similarity   | 0.10  | 
+
+### Serendipity 
+
+TBD. This is actually an important part of the Muzilla philosophy, but this is hard to define ;)
