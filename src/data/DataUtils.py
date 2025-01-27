@@ -1,102 +1,182 @@
 import logging
 import os
 import pickle
-import random
+from typing import Tuple, Dict, Any
 
+import torch
 import pandas as pd
 import numpy as np
 from PIL import Image
-import torch
+from torch import Tensor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def load_data(data_file: str, device: torch.device = torch.device("cpu")) -> torch.Tensor:
-    # Load the data
-    logger.info(f"(Re)Loading and processing the data")
-    data = pd.read_csv(data_file)
-    data.columns = ['user_id', 'artist_id', 'album_count']
-
-    # Convert user_id and artist_id to categorical codes
-    row = torch.tensor(data['user_id'].astype('category').cat.codes, dtype=torch.int64, device=device)
-    col = torch.tensor(data['artist_id'].astype('category').cat.codes, dtype=torch.int64, device=device)
-    values = torch.tensor(data['album_count'].values, dtype=torch.float32, device=device)
-
-    # Determine the shape of the sparse tensor
-    num_rows = row.max().item() + 1
-    num_cols = col.max().item() + 1
-
-    logger.info(f"Making COO tensor")
-    # Create COO sparse tensor
-    coo_tensor = torch.sparse_coo_tensor(
-        indices=torch.stack([row, col]),
-        values=values,
-        size=(num_rows, num_cols),
-        device=device
-    )
-
-    logger.info(f"Calling COO coalesce")
-    return coo_tensor.coalesce()
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
+logger.info(f"Using device: {device}")
 
 
-def load_or_create(raw_data_file, sparse_data_file, force_reprocess=False):
-    # (Re)create the sparse matrix
-    if force_reprocess or not os.path.isfile(sparse_data_file):
-        sparse_matrix = load_data(raw_data_file)
-        with open(sparse_data_file, "wb") as f:
-            pickle.dump(sparse_matrix, f)
-    else:
-        # Load the sparse matrix using pickle
-        with open(sparse_data_file, "rb") as f:
-            sparse_matrix = pickle.load(f)
-    return sparse_matrix
-
-
-# TODO: Add a seed variable so tests can be reproduced. (Also write tests)
-def remove_random_values(user_tensor, num_remove=10):
+def load_data(data_file: str) -> tuple[Tensor, list[int], list[int]]:
     """
-    Remove random non-zero values from a torch.tensor.
+    Loads user-artist interaction data from a CSV file and converts it into a sparse COO tensor.
 
     Args:
-        user_tensor (torch.tensor): Input dense tensor.
-        num_remove (int): Number of random values to remove.
+        data_file (str): Path to the CSV file containing the interaction data.
+                         The file must have the following columns:
+                         - `user_id`: Unique identifier for each user.
+                         - `artist_id`: Unique identifier for each artist.
+                         - `album_count`: Interaction count (e.g., number of albums listened to).
 
     Returns:
-        torch.tensor: The updated dense tensor with values removed.
-        list: A sorted list of removed items in the form [(row, col, value), ...],
-              sorted by value in descending order.
-    """
-    if user_tensor.is_sparse:
-        raise ValueError("Input tensor must be dense.")
+        torch.Tensor: A PyTorch sparse COO tensor with:
+                      - Indices representing `user_id` and `artist_id`.
+                      - Values representing the `album_count`.
+                      - Size derived from the maximum `user_id` and `artist_id` values.
 
-    # Find all non-zero entries
-    non_zero_indices = torch.nonzero(user_tensor, as_tuple=False)
-    non_zero_values = user_tensor[non_zero_indices[:, 0], non_zero_indices[:, 1]]
+    Raises:
+        FileNotFoundError: If the specified CSV file does not exist.
+        KeyError: If the required columns (`user_id`, `artist_id`, `album_count`) are missing.
+        ValueError: If the data contains invalid or unexpected values (e.g., negative counts).
+
+    Notes:
+        - The function uses categorical encoding to convert `user_id` and `artist_id` into integer indices.
+        - The resulting tensor is moved to the current device (`cpu` or `cuda`) as determined by PyTorch.
+
+    Example:
+        ```python
+        sparse_tensor = load_data("user_artist_interactions.csv")
+        print(sparse_tensor)
+        ```
+
+    Logging:
+        - Logs information about the processing stages (loading data, creating tensor, etc.).
+
+    """
+    if not os.path.exists(data_file):
+        raise FileNotFoundError(f"Data file {data_file} not found.")
+
+    df = pd.read_csv(data_file, header=None, names=['user_id', 'artist_id', 'album_count'])
+
+    user_ids = df['user_id'].unique()
+    artist_ids = df['artist_id'].unique()
+
+    # Create dictionaries to map original IDs to new indices
+    user_id_map = {original_id: index for index, original_id in enumerate(user_ids)}
+    artist_id_map = {original_id: index for index, original_id in enumerate(artist_ids)}
+
+    # Replace original IDs with new indices in the dataframe
+    df['user_index'] = df['user_id'].map(user_id_map)
+    df['artist_index'] = df['artist_id'].map(artist_id_map)
+
+    # Extract indices and values
+    indices = [df['user_index'].values, df['artist_index'].values]
+    values = df['album_count'].values
+
+    # Create sparse tensor
+    tensor = torch.sparse_coo_tensor(indices, values).coalesce()
+
+    return tensor, user_ids, artist_ids
+
+
+def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> Tuple[torch.Tensor, Dict[int, int], Dict[int, int]]:
+    """
+    Loads a preprocessed sparse matrix from disk or creates it from raw data if necessary.
+
+    Args:
+        raw_data_file (str): Path to the raw data file (e.g., a CSV file) containing user-artist interactions.
+        sparse_data_file (str): Path to the serialized sparse matrix file (e.g., a `.pkl` file).
+        force_reprocess (bool, optional): If `True`, reprocess the raw data file even if the serialized file exists.
+                                          Defaults to `False`.
+
+    Returns:
+        torch.Tensor: A sparse tensor representing the user-artist interaction matrix.
+
+    Raises:
+        FileNotFoundError: If `raw_data_file` does not exist when reprocessing is required.
+        ValueError: If the deserialized sparse matrix is incompatible with the current system or corrupted.
+
+    Notes:
+        - The sparse matrix is serialized and deserialized using the `pickle` module.
+        - The function moves the sparse tensor to the current device (`cpu` or `cuda`) as determined by PyTorch.
+
+    Example:
+        ```python
+        sparse_matrix = load_or_create(
+            raw_data_file="user_artist_data.csv",
+            sparse_data_file="user_artist_matrix.pkl",
+            force_reprocess=True
+        )
+        print(sparse_matrix)
+        ```
+    """
+    if force_reprocess or not os.path.isfile(sparse_data_file):
+        logger.info(f"Reprocessing data from {raw_data_file}")
+        sparse_matrix, user_ids, artist_ids = load_data(raw_data_file)
+        with open(sparse_data_file, "wb") as f:
+            pickle.dump((sparse_matrix, user_ids, artist_ids), f)
+    else:
+        logger.info(f"Loading data from file {sparse_data_file}")
+        with open(sparse_data_file, "rb") as f:
+            sparse_matrix, user_ids, artist_ids = pickle.load(f)
+    return sparse_matrix.to(device), user_ids, artist_ids
+
+
+def remove_random_values(user_tensor: torch.Tensor, num_remove: int = 10, seed: int = None):
+    """
+    Remove random non-zero values from a sparse COO tensor.
+
+    Args:
+        user_tensor (torch.sparse_coo_tensor): Input sparse COO tensor.
+        num_remove (int): Number of random values to remove.
+        seed (int, optional): Random seed for reproducibility.
+
+    Returns:
+        torch.sparse_coo_tensor: The updated sparse tensor with values removed.
+        list: A sorted list of artists (column indices) sorted by album frequency in descending order.
+    """
+    if not user_tensor.is_sparse:
+        raise ValueError("Input tensor must be a sparse COO tensor.")
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    # Extract indices and values
+    indices = user_tensor.indices()
+    values = user_tensor.values()
 
     # Determine how many values to remove
-    actual_remove = min(num_remove, int(non_zero_values.numel() * 0.1))
+    actual_remove = min(num_remove, int(values.numel() * 0.1))
 
     # Select random indices to remove
     if actual_remove > 0:
-        remove_indices = random.sample(range(non_zero_values.numel()), actual_remove)
+        remove_indices = torch.multinomial(values, actual_remove, replacement=False)
     else:
-        remove_indices = []
+        remove_indices = torch.tensor([], dtype=torch.int64, device=user_tensor.device)
 
     # Get the rows, columns, and values to be removed
-    removed_items = []
-    for idx in remove_indices:
-        row, col = non_zero_indices[idx].tolist()
-        value = user_tensor[row, col].item()
-        removed_items.append((row, col, value))
-        user_tensor[row, col] = 0  # Remove the value
+    removed_items = [
+        (indices[0, idx].item(), indices[1, idx].item(), values[idx].item())
+        for idx in remove_indices
+    ]
+
+    # Create new indices and values without the removed items
+    keep_mask = torch.ones_like(values, dtype=torch.bool)
+    keep_mask[remove_indices] = False
+    new_indices = indices[:, keep_mask]
+    new_values = values[keep_mask]
 
     # Sort removed items by value in descending order
     removed_items = sorted(removed_items, key=lambda x: x[2], reverse=True)
-    removed_artists = [x[1] for x in removed_items]
+    removed_artists = [item[1] for item in removed_items]
 
-    return user_tensor, removed_artists
+    # Create the updated sparse tensor
+    updated_tensor = torch.sparse_coo_tensor(new_indices, new_values, user_tensor.size(), device=user_tensor.device)
+
+    return updated_tensor.coalesce(), removed_artists
 
 
 # Normalize sparse tensor row-wise
@@ -144,3 +224,4 @@ def dump_to_image(user_artist_matrix, out_file_name, show_image=False):
 if __name__ == "__main__":
     # TODO: Run some tests
     pass
+
