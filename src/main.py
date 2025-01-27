@@ -90,8 +90,8 @@ def main(config_file):
     user_buckets = distribute_sparse_tensor(user_artist_matrix, num_folds)
 
     # Check: Make and test a model on a single fold of the data
-    model = model_class(user_buckets[0])
-    print(evaluate(model, user_buckets[0]))
+    # model = model_class(user_buckets[0])
+    # print(evaluate(model, user_buckets[0]))
 
     for i, test_tensor in enumerate(user_buckets):
         logger.info(f"Starting a cross-validation batch {i}")

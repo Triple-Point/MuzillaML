@@ -82,14 +82,20 @@ The random_model generates a list of 𝑘 randomly selected artists.
 
 ...or basically zero.
 
-#### Popularity mode
+#### Popularity model
 
 The popularity model calculates the most popular artists, and recommends them.
 
 Not optimised for time, so I stopped before cross validation was done. Converged on an average MAP score of: 0.002827381577617915
 Better than chance. w00t!!!
 
+#### Cosine Similarity model
 
+The Cosine Similarity finds a user with the lowest cosine angle, and selects the most popular artists from that user. If there are not enough recommendations, the next closest user is selected and so on.
+
+Using 10% of the data, and using the same data set for training and testing, the MAP converges to about 0.60
+
+Cross validation results OTW
 
 ### Serendipity 
 
