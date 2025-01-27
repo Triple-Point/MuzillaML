@@ -1,5 +1,5 @@
-# MusillaML
-Machine Learning for the Musilla project
+# MuzillaML
+Machine Learning for the Muzilla project
 
 ## Usage
 python main --config [path to config.yaml]
@@ -7,7 +7,7 @@ python main --config [path to config.yaml]
 ### config.yaml
 
     data:
-        raw_data: [path to the latest Musilla data]
+        raw_data: [path to the latest Muzilla data]
 
     model:
         model: [cosine_model|tfidf_model|popularity_model|random_model]
@@ -20,7 +20,7 @@ That is given a list of users, artists and album counts, can we recommend a new 
 
 ## Data description
 
-The Musilla data set is proprietary. It is formatted as user, artist and count of albums.
+The Muzilla data set is proprietary. It is formatted as user, artist and count of albums.
 
 Where albums are credited to more than one artist 
 (For example, [Split albums](https://en.wikipedia.org/wiki/Split_album) and [Compilation albums](https://en.wikipedia.org/wiki/Compilation_album)), 
