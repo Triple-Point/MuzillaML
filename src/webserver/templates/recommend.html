@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Recommendations</title>
+</head>
+<body>
+    <h1>Recommendations for User {{ user_id }}</h1>
+    <ul>
+        {% for artist in recommendations %}
+            <li>
+                {{ artist }}
+                <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
+                    <input type="hidden" name="artist" value="{{ artist }}">
+                    <button type="submit" name="action" value="like">Thumbs Up</button>
+                    <button type="submit" name="action" value="dislike">Thumbs Down</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
