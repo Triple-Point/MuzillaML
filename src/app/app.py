@@ -4,7 +4,7 @@ import sqlite3
 import random
 import argparse
 
-from src.data.DataUtils import load_or_create
+from src.data.FileUtils import load_or_create
 from src.models.cosine_model import CosineModel
 
 app = Flask(__name__)

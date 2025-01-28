@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import List
+
 import torch
 
 
@@ -21,3 +23,7 @@ class RecommenderModel(ABC):
         :return: Ordered list of most recommended items
         """
         pass
+
+    def recommend_items_list(self, user: List[int], topn: int = 10):
+        user_tensor = torch.sparse_coo_tensor()
+        return self.recommend_items(user, topn)

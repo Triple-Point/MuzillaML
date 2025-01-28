@@ -2,8 +2,8 @@ import argparse
 import logging
 import yaml
 
-from data.DataUtils import load_or_create, remove_random_values
-from src.data.DataUtils import dump_to_image
+from data.DataUtils import remove_random_values
+from src.data.FileUtils import load_or_create, dump_to_image
 from src.data.TensorUtils import distribute_sparse_tensor, concatenate_except_one, get_users
 from src.metrics.AveragePrecision import average_precision
 

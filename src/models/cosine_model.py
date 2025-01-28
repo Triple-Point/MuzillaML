@@ -77,6 +77,3 @@ class CosineModel(RecommenderModel):
                 user_artists |= set(new_recommendations)
 
         raise ValueError("Unable to generate recommendations with the given inputs.")
-
-    def recommend_items_list(self, user: List[int], topn: int = 10):
-        return self.recommend_items(user, topn)
