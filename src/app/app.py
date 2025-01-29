@@ -1,12 +1,10 @@
-import csv
-
 import yaml
 from flask import Flask, request, render_template, redirect, url_for
 import random
 import argparse
 import json
 
-from src.data.FileUtils import load_or_create
+from src.data.FileUtils import load_or_create, load_csv_to_dict
 from src.models.cosine_model import CosineModel
 
 app = Flask(__name__)
@@ -14,8 +12,6 @@ app = Flask(__name__)
 model = None
 
 FILE_PATH = "data/user_db.json"
-
-ARTIST_LOOKUP = "data/artists_id_name.csv"
 
 
 def read_json(file_path):
@@ -62,37 +58,7 @@ def write_json(file_path, data):
 
 users = read_json(FILE_PATH)
 
-
-def load_csv_to_dict(file_path):
-    """
-    Loads a CSV file containing key-value pairs into a dictionary.
-
-    Args:
-        file_path (str): Path to the CSV file.
-
-    Returns:
-        dict: A dictionary with keys and values from the CSV file.
-    """
-    result_dict = {}
-    try:
-        with open(file_path, mode='r', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            for row in reader:
-                if len(row) == 2:  # Ensure there are exactly two columns
-                    key, value = row
-                    result_dict[int(key)] = value
-                else:
-                    print(f"Skipping invalid row: {row}")
-        return result_dict
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return {}
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return {}
-
-
-artist_lookup = load_csv_to_dict(ARTIST_LOOKUP)
+artist_name_lookup = None
 artist_id_lookup = {}
 
 @app.route('/')
@@ -151,9 +117,9 @@ def model_recommend_items(artist_list, album_count, num):
     print(artist_list, album_count, num)
     recommended_artists = model.recommend_items_list(artist_list, album_count, num)
     print(f"{recommended_artists=}")
-    print(f"{artist_lookup=}")
+    print(f"{artist_name_lookup=}")
     print(f"{[artist_id_lookup[i] for i in recommended_artists]}")
-    artists = [artist_lookup[artist_id_lookup[i]] if artist_id_lookup[i] in artist_lookup else "<UNKNOWN_ARTIST>" for i in recommended_artists]
+    artists = [artist_name_lookup[artist_id_lookup[i]] if artist_id_lookup[i] in artist_name_lookup else "<UNKNOWN_ARTIST>" for i in recommended_artists]
     return artists
 
 
@@ -175,5 +141,6 @@ if __name__ == '__main__':
     config = load_config(args.config)
     user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
                                                                     config['data']['processed_data'])
+    artist_name_lookup = load_csv_to_dict(config['data']['artist_lookup_table'])
     model = CosineModel(user_artist_matrix)
     app.run(debug=True)

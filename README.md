@@ -85,6 +85,7 @@ The random_model generates a list of 𝑘 randomly selected artists.
 ### Popularity model
 
 The popularity model calculates the most popular artists, and recommends them.
+In this case, the album count is ignored - only the occurrence of an artist in all collections is considered.
 
 Cross-validation MAP scores of [
 7.05, 6.79, 7.09, 6.94, 6.85, 7.13, 6.94, 7.05, 7.02, 6.68] * 10<sup>-3</sup>

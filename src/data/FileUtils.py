@@ -1,3 +1,4 @@
+import csv
 import os
 import pickle
 import logging
@@ -59,7 +60,9 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
 
     # Create dictionaries to map original IDs to new indices
     user_id_map = {original_id: index for index, original_id in enumerate(user_ids)}
+    user_id_reverse_map = {index: original_id for index, original_id in enumerate(user_ids.tolist())}
     artist_id_map = {original_id: index for index, original_id in enumerate(artist_ids)}
+    artist_id_reverse_map = {index: original_id for index, original_id in enumerate(artist_ids.tolist())}
 
     # Replace original IDs with new indices in the dataframe
     df['user_index'] = df['user_id'].map(user_id_map)
@@ -72,7 +75,7 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
     # Create sparse tensor
     tensor = torch.sparse_coo_tensor(indices, values).coalesce()
 
-    return tensor, user_id_map, artist_id_map
+    return tensor, user_id_reverse_map, artist_id_reverse_map
 
 
 def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
@@ -140,3 +143,32 @@ def dump_to_image(user_artist_matrix: torch.sparse_coo_tensor, out_file_name: st
     # Show the image (optional)
     if show_image:
         img.show()
+
+
+def load_csv_to_dict(file_path):
+    """
+    Loads a CSV file containing key-value pairs into a dictionary.
+
+    Args:
+        file_path (str): Path to the CSV file.
+
+    Returns:
+        dict: A dictionary with keys and values from the CSV file.
+    """
+    result_dict = {}
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if len(row) == 2:  # Ensure there are exactly two columns
+                    key, value = row
+                    result_dict[int(key)] = value
+                else:
+                    print(f"Skipping invalid row: {row}")
+        return result_dict
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return {}
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {}
