@@ -60,9 +60,7 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
 
     # Create dictionaries to map original IDs to new indices
     user_id_map = {original_id: index for index, original_id in enumerate(user_ids)}
-    user_id_reverse_map = {index: original_id for index, original_id in enumerate(user_ids.tolist())}
     artist_id_map = {original_id: index for index, original_id in enumerate(artist_ids)}
-    artist_id_reverse_map = {index: original_id for index, original_id in enumerate(artist_ids.tolist())}
 
     # Replace original IDs with new indices in the dataframe
     df['user_index'] = df['user_id'].map(user_id_map)
@@ -75,7 +73,7 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
     # Create sparse tensor
     tensor = torch.sparse_coo_tensor(indices, values).coalesce()
 
-    return tensor, user_id_reverse_map, artist_id_reverse_map
+    return tensor, user_id_map, artist_id_map
 
 
 def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
@@ -160,9 +158,10 @@ def load_csv_to_dict(file_path):
         with open(file_path, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
             for row in reader:
-                if len(row) == 2:  # Ensure there are exactly two columns
-                    key, value = row
-                    result_dict[int(key)] = value
+                if len(row) >= 2:  # Ensure there are at least two columns
+                    key = int(row[0])
+                    value = row[1] if len(row) == 2 else ', '.join(row[1:])
+                    result_dict[key] = value
                 else:
                     print(f"Skipping invalid row: {row}")
         return result_dict
@@ -172,3 +171,26 @@ def load_csv_to_dict(file_path):
     except Exception as e:
         print(f"An error occurred: {e}")
         return {}
+
+
+class ArtistLookup:
+    def __init__(self, artist_id_lookup: dict[int, int], name_file: str):
+        self.id_to_artist = load_csv_to_dict(name_file)
+        self.artist_to_id = {output: index for index, output in self.id_to_artist.items()}
+        self.output_to_id = artist_id_lookup
+        self.id_to_output = {output: index for index, output in self.output_to_id.items()}
+
+    def outputs_to_artists(self, output: list[int]):
+        original_ids = [self.output_to_id[i] for i in output]
+        artist_list = [self.id_to_artist[i] for i in original_ids]
+        return artist_list
+
+    def artists_to_ids(self, artists: list[str]) -> list[int]:
+        return [
+            self.artist_to_id[artist] if artist in self.artist_to_id else -1 for artist in artists
+        ]
+
+    def ids_to_artists(self, ids:list[int]) -> list[str]:
+        return [
+            self.id_to_artist[i] if i in self.id_to_artist else "<???>" for i in ids
+        ]
