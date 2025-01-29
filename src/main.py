@@ -4,7 +4,7 @@ import yaml
 
 from data.DataUtils import remove_random_values
 from src.data.FileUtils import load_or_create, dump_to_image
-from src.data.TensorUtils import distribute_sparse_tensor, concatenate_except_one, get_users
+from src.data.TensorUtils import create_buckets, concatenate_except_one, get_all_users
 from src.metrics.AveragePrecision import average_precision
 
 # Set up logging
@@ -43,7 +43,7 @@ def evaluate(model, test_tensor):
     """
     total_score = 0
     i = 0
-    for i, user in enumerate(get_users(test_tensor)):
+    for i, user in enumerate(get_all_users(test_tensor)):
         # TODO: Batch some of this to save time?
         masked_user, masked_artists = remove_random_values(user)
         # Generate the top-n artists
@@ -87,7 +87,7 @@ def main(config_file):
 
     eval_scores = []
     logger.info(f"Splitting into {num_folds} cross-validation sets")
-    user_buckets = distribute_sparse_tensor(user_artist_matrix, num_folds)
+    user_buckets = create_buckets(user_artist_matrix, num_folds)
 
     # Check: Make and test a model on a single fold of the data
     # model = model_class(user_buckets[0])
