@@ -1,5 +1,6 @@
 import os
 import pickle
+import logging
 from typing import Tuple, Dict
 
 import numpy as np
@@ -8,7 +9,10 @@ import torch
 from PIL import Image
 from torch import Tensor
 
-from src.data.DataUtils import logger, device
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def load_data(data_file: str) -> tuple[Tensor, list[int], list[int]]:
@@ -113,7 +117,7 @@ def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: b
         logger.info(f"Loading data from file {sparse_data_file}")
         with open(sparse_data_file, "rb") as f:
             sparse_matrix, user_ids, artist_ids = pickle.load(f)
-    return sparse_matrix.to(device), user_ids, artist_ids
+    return sparse_matrix, user_ids, artist_ids
 
 
 def dump_to_image(user_artist_matrix, out_file_name, show_image=False):
