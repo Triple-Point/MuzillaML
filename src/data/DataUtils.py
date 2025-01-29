@@ -1,5 +1,4 @@
 import logging
-
 import torch
 
 # Set up logging
@@ -13,18 +12,19 @@ else:
 logger.info(f"Using device: {device}")
 
 
-def remove_random_values(user_tensor: torch.Tensor, num_remove: int = 10, seed: int = None):
+def remove_random_values(user_tensor: torch.sparse_coo_tensor, num_remove: int = 10, seed: int = None) -> tuple[torch.sparse_coo_tensor, list[int]]:
     """
     Remove random non-zero values from a sparse COO tensor.
 
     Args:
         user_tensor (torch.sparse_coo_tensor): Input sparse COO tensor.
-        num_remove (int): Number of random values to remove.
+        num_remove (int): Number of random values to remove. Default 10. Note: A maximum of 10% of the items will be removed
         seed (int, optional): Random seed for reproducibility.
 
     Returns:
         torch.sparse_coo_tensor: The updated sparse tensor with values removed.
         list: A sorted list of artists (column indices) sorted by album frequency in descending order.
+
     """
     if not user_tensor.is_sparse:
         raise ValueError("Input tensor must be a sparse COO tensor.")
@@ -67,25 +67,28 @@ def remove_random_values(user_tensor: torch.Tensor, num_remove: int = 10, seed: 
     return updated_tensor.coalesce(), removed_artists
 
 
-# Normalize sparse tensor row-wise
-def normalize_sparse_tensor(sparse_tensor):
-    # Compute L2 norm of each row
-    row_norms = torch.sqrt(torch.sparse.sum(sparse_tensor.pow(2), dim=1).to_dense())
-    row_norms = torch.where(row_norms == 0, torch.tensor(1.0, device=row_norms.device), row_norms)  # Avoid div by zero
+def get_sorted_artists(user_id: int, sparse_tensor: torch.sparse_coo_tensor) -> tuple[list[int], list[float]]:
+    # Extract the indices and values from the sparse tensor for the given user ID
+    indices = sparse_tensor.indices()
+    values = sparse_tensor.values()
 
-    # Create a diagonal sparse tensor for normalization
-    row_norms_inv = 1.0 / row_norms
-    row_indices = torch.arange(row_norms.size(0), device=row_norms.device)
-    diagonal_indices = torch.stack([row_indices, row_indices])
-    diagonal_values = row_norms_inv
-    norm_diagonal = torch.sparse_coo_tensor(diagonal_indices, diagonal_values,
-                                            size=(row_norms.size(0), row_norms.size(0)))
+    # Locate the positions in the indices corresponding to the given user_id
+    target_user_indices = indices[0] == user_id
+    user_artist_indices = indices[1][target_user_indices]
 
-    # Normalize rows of the sparse tensor
-    return torch.sparse.mm(norm_diagonal, sparse_tensor)
+    # Extract the corresponding values for the user
+    user_artist_values = values[indices[0] == user_id]
+
+    # Sort indices based on the values in descending order
+    sorted_indices = torch.argsort(user_artist_values, descending=True)
+
+    # Retrieve the sorted artists and their corresponding values
+    sorted_artists = user_artist_indices[sorted_indices]
+    sorted_values = user_artist_values[sorted_indices]
+
+    return sorted_artists, sorted_values
 
 
 if __name__ == "__main__":
     # TODO: Run some tests
     pass
-

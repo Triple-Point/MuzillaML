@@ -1,13 +1,11 @@
 import os
 import pickle
 import logging
-from typing import Tuple, Dict
 
 import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
-from torch import Tensor
 
 
 # Set up logging
@@ -15,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def load_data(data_file: str) -> tuple[Tensor, list[int], list[int]]:
+def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
     """
     Loads user-artist interaction data from a CSV file and converts it into a sparse COO tensor.
 
@@ -74,10 +72,10 @@ def load_data(data_file: str) -> tuple[Tensor, list[int], list[int]]:
     # Create sparse tensor
     tensor = torch.sparse_coo_tensor(indices, values).coalesce()
 
-    return tensor, user_ids, artist_ids
+    return tensor, user_id_map, artist_id_map
 
 
-def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> Tuple[torch.Tensor, Dict[int, int], Dict[int, int]]:
+def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
     """
     Loads a preprocessed sparse matrix from disk or creates it from raw data if necessary.
 
@@ -110,17 +108,17 @@ def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: b
     """
     if force_reprocess or not os.path.isfile(sparse_data_file):
         logger.info(f"Reprocessing data from {raw_data_file}")
-        sparse_matrix, user_ids, artist_ids = load_data(raw_data_file)
+        sparse_matrix, user_id_map, artist_id_map = load_data(raw_data_file)
         with open(sparse_data_file, "wb") as f:
-            pickle.dump((sparse_matrix, user_ids, artist_ids), f)
+            pickle.dump((sparse_matrix, user_id_map, artist_id_map), f)
     else:
         logger.info(f"Loading data from file {sparse_data_file}")
         with open(sparse_data_file, "rb") as f:
-            sparse_matrix, user_ids, artist_ids = pickle.load(f)
-    return sparse_matrix, user_ids, artist_ids
+            sparse_matrix, user_id_map, artist_id_map = pickle.load(f)
+    return sparse_matrix, user_id_map, artist_id_map
 
 
-def dump_to_image(user_artist_matrix, out_file_name, show_image=False):
+def dump_to_image(user_artist_matrix: torch.sparse_coo_tensor, out_file_name: str, show_image=False):
     # Sum the rows and columns
     row_sums = user_artist_matrix.sum(axis=1).A1  # Summing rows
     col_sums = user_artist_matrix.sum(axis=0).A1  # Summing columns

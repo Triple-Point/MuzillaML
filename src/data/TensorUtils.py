@@ -1,5 +1,4 @@
 import logging
-
 import torch
 
 # Set up logging
@@ -12,7 +11,7 @@ else:
     device = "cpu"
 
 
-def distribute_sparse_tensor(sparse_tensor: torch.Tensor, num_buckets: int = 10) -> list[torch.Tensor]:
+def create_buckets(sparse_tensor: torch.sparse_coo_tensor, num_buckets: int = 10) -> list[torch.sparse_coo_tensor]:
     """
     Distribute the users from a collated torch.sparse_coo_tensor into `num_buckets` tensors cyclically.
 
@@ -24,9 +23,9 @@ def distribute_sparse_tensor(sparse_tensor: torch.Tensor, num_buckets: int = 10)
         list: A list of torch.sparse_coo_tensor, one for each bucket.
     """
     if not sparse_tensor.is_sparse:
-        raise ValueError("Input tensor must be a sparse COO tensor.")
+        raise ValueError(f"Input tensor must be a sparse COO tensor, not {sparse_tensor}")
     if num_buckets <= 0:
-        raise ValueError("num_buckets must be a positive integer.")
+        raise ValueError(f"num_buckets must be a positive integer. Got: {num_buckets}")
 
     sub_tensors = []
 
@@ -48,7 +47,7 @@ def distribute_sparse_tensor(sparse_tensor: torch.Tensor, num_buckets: int = 10)
     return sub_tensors
 
 
-def concatenate_except_one(sub_tensors, excluded_index):
+def concatenate_except_one(sub_tensors: list[torch.sparse_coo_tensor], excluded_index: int) -> torch.sparse_coo_tensor:
     """
     Concatenate all tensors except the one at the excluded index.
 
@@ -65,6 +64,8 @@ def concatenate_except_one(sub_tensors, excluded_index):
     # Ensure all tensors have the same size
     if not all(tensor.size(1) == size[1] for tensor in sub_tensors):
         raise ValueError("All tensors must have the same number of columns.")
+    if not all(tensor.is_sparse for tensor in sub_tensors):
+        raise ValueError("Input tensors must all be a sparse COO tensor")
 
     total_rows = 0
 
@@ -97,32 +98,7 @@ def concatenate_except_one(sub_tensors, excluded_index):
     return concatenated_tensor.coalesce()
 
 
-import torch
-
-
-def get_sorted_artists(user_id, sparse_tensor):
-    # Extract the indices and values from the sparse tensor
-    indices = sparse_tensor.indices()
-    values = sparse_tensor.values()
-
-    # Locate the positions in the indices corresponding to the given user_id
-    target_user_indices = indices[0] == user_id
-    user_artist_indices = indices[1][target_user_indices]
-
-    # Extract the corresponding values for the user
-    user_artist_values = values[indices[0] == user_id]
-
-    # Sort indices based on the values in descending order
-    sorted_indices = torch.argsort(user_artist_values, descending=True)
-
-    # Retrieve the sorted artists and their corresponding values
-    sorted_artists = user_artist_indices[sorted_indices]
-    sorted_values = user_artist_values[sorted_indices]
-
-    return sorted_artists, sorted_values
-
-
-def get_users(sparse_tensor):
+def get_all_users(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
     """
     Extracts per-user sparse tensors from a given sparse COO tensor.
 
@@ -161,3 +137,24 @@ def get_users(sparse_tensor):
         ).coalesce()
 
         yield user_sparse
+
+
+# Normalize sparse tensor row-wise
+def normalize_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
+    if not sparse_tensor.is_sparse:
+        raise ValueError(f"Input tensor must be a sparse COO tensor, not {sparse_tensor}")
+
+    # Compute L2 norm of each row
+    row_norms = torch.sqrt(torch.sparse.sum(sparse_tensor.pow(2), dim=1).to_dense())
+    row_norms = torch.where(row_norms == 0, torch.tensor(1.0, device=row_norms.device), row_norms)  # Avoid div by zero
+
+    # Create a diagonal sparse tensor for normalization
+    row_norms_inv = 1.0 / row_norms
+    row_indices = torch.arange(row_norms.size(0), device=row_norms.device)
+    diagonal_indices = torch.stack([row_indices, row_indices])
+    diagonal_values = row_norms_inv
+    norm_diagonal = torch.sparse_coo_tensor(diagonal_indices, diagonal_values,
+                                            size=(row_norms.size(0), row_norms.size(0)))
+
+    # Normalize rows of the sparse tensor
+    return torch.sparse.mm(norm_diagonal, sparse_tensor)
