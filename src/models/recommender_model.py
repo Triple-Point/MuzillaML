@@ -14,7 +14,7 @@ class RecommenderModel(ABC):
         self.data = data
 
     @abstractmethod
-    def recommend_items(self, user: torch.sparse_coo_tensor, topn=10):
+    def recommend_items(self, user: torch.sparse_coo_tensor, topn=10) -> List[int]:
         """
         Compute and return the index of a new artist for the given user.
 
@@ -24,6 +24,18 @@ class RecommenderModel(ABC):
         """
         pass
 
-    def recommend_items_list(self, user: List[int], topn: int = 10):
-        user_tensor = torch.sparse_coo_tensor()
-        return self.recommend_items(user, topn)
+    def recommend_items_list(self, user: List[int], album_counts = None, topn: int = 10) -> List[int]:
+        """
+        List-based wrapper for recommend_items
+        :param album_counts:
+        :param user:
+        :param topn:
+        :return:
+        """
+        indices = [[0]*len(user), user]
+        if album_counts:
+            values = album_counts
+        else:
+            values = [1] * len(user)
+        user_tensor = torch.sparse_coo_tensor(indices, values, size=(1, 522106), dtype=torch.float64)
+        return self.recommend_items(user_tensor, topn)
