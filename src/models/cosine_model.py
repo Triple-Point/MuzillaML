@@ -3,8 +3,8 @@ import numpy as np
 import torch
 import logging
 
-from src.data.DataUtils import normalize_sparse_tensor
-from src.data.TensorUtils import get_sorted_artists
+from src.data.TensorUtils import normalize_sparse_tensor
+from src.data.DataUtils import get_sorted_artists
 from src.models.recommender_model import RecommenderModel
 
 # Set up logging
