@@ -4,8 +4,9 @@ import random
 import argparse
 import json
 
-from src.data.FileUtils import load_or_create, load_csv_to_dict
+from src.data.FileUtils import load_or_create, ArtistLookup
 from src.models.cosine_model import CosineModel
+from src.models.model_factory import model_factory
 
 app = Flask(__name__)
 
@@ -57,9 +58,7 @@ def write_json(file_path, data):
 
 
 users = read_json(FILE_PATH)
-
 artist_name_lookup = None
-artist_id_lookup = {}
 
 @app.route('/')
 def index():
@@ -93,12 +92,13 @@ def recommend(user_id):
     # Call your recommendation model to get a list of new artists
     new_recommendations = model_recommend_items(user['liked_artists'], user['album_count'], ON_SCREEN_ARTISTS)
     print(f"{new_recommendations=}")
+    global artist_name_lookup
 
     if request.method == 'POST':
         artist = request.form['artist']
         action = request.form['action']
         if action == 'like':
-            user['liked_artists'].append(artist)
+            user['liked_artists'].extend(artist_name_lookup.artists_to_ids([artist]))
             user['album_count'].append(1)
         elif action == 'dislike':
             user['disliked_artists'].append(artist)
@@ -107,20 +107,20 @@ def recommend(user_id):
         write_json(FILE_PATH, users)
 
         new_recommendations = model_recommend_items(user['liked_artists'], user['album_count'], ON_SCREEN_ARTISTS)
+    liked_strings = artist_name_lookup.ids_to_artists(user['liked_artists'])
+    disliked_strings = artist_name_lookup.ids_to_artists(user['disliked_artists'])
 
     return render_template('recommend.html', user_id=user_id, recommendations=new_recommendations,
-                           liked_artists=user['liked_artists'], disliked_artists=user['disliked_artists'])
+                           liked_artists=liked_strings, disliked_artists=disliked_strings)
 
 
-def model_recommend_items(artist_list, album_count, num):
-    # Dummy function for recommendation
-    print(artist_list, album_count, num)
+def model_recommend_items(artist_list: list[int], album_count: list[int], num: int) -> list[str]:
+    print(f"{artist_list=}")
     recommended_artists = model.recommend_items_list(artist_list, album_count, num)
-    print(f"{recommended_artists=}")
-    print(f"{artist_name_lookup=}")
-    print(f"{[artist_id_lookup[i] for i in recommended_artists]}")
-    artists = [artist_name_lookup[artist_id_lookup[i]] if artist_id_lookup[i] in artist_name_lookup else "<UNKNOWN_ARTIST>" for i in recommended_artists]
-    return artists
+    global artist_name_lookup
+    artist_strings = artist_name_lookup.outputs_to_artists(recommended_artists)
+    print(f"{artist_strings=}")
+    return artist_strings
 
 
 def load_config(config_file):
@@ -134,13 +134,20 @@ def load_config(config_file):
         raise ValueError(f"Error parsing YAML file: {e}")
 
 
+def main(config):
+    global model
+    global artist_name_lookup
+    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
+                                                                       config['data']['processed_data'])
+    artist_name_lookup = ArtistLookup(artist_id_lookup, config['data']['artist_lookup_table'])
+    model_class = model_factory(config['model']['model'])
+    model = model_class(user_artist_matrix)
+    app.run(debug=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Experiment Configurations')
     parser.add_argument('--config', type=str, required=True, help='Path to config file')
     args = parser.parse_args()
     config = load_config(args.config)
-    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
-                                                                    config['data']['processed_data'])
-    artist_name_lookup = load_csv_to_dict(config['data']['artist_lookup_table'])
-    model = CosineModel(user_artist_matrix)
-    app.run(debug=True)
+    main(config)

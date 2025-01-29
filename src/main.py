@@ -3,20 +3,14 @@ import logging
 import yaml
 
 from data.DataUtils import remove_random_values
-from src.data.FileUtils import load_or_create, dump_to_image, load_csv_to_dict
+from src.data.FileUtils import load_or_create, dump_to_image, ArtistLookup
 from src.data.TensorUtils import create_buckets, concatenate_except_one, get_all_users
 from src.metrics.AveragePrecision import average_precision
+from src.models.model_factory import MODEL_CLASSES, model_factory
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-MODEL_CLASSES = {
-    'cosine_model': 'src.models.cosine_model.CosineModel',
-    'random_model': 'src.models.random_model.RandomModel',
-    'tfidf_model': 'src.models.tfidf_model.TFIDFModel',
-    'popularity_model': 'src.models.popularity_model.PopularityModel'
-}
 
 
 def load_config(config_file):
@@ -30,8 +24,8 @@ def load_config(config_file):
         raise ValueError(f"Error parsing YAML file: {e}")
 
 
-artist_name_lookup = None
-artist_id_lookup = None
+artist_lookup = {}
+
 
 def evaluate(model, test_tensor):
     """
@@ -50,11 +44,10 @@ def evaluate(model, test_tensor):
         # TODO: Batch some of this to save time?
         masked_user, masked_artists = remove_random_values(user)
         # Generate the top-n artists
-        new_artist_list = model.recommend_items(masked_user, len(masked_artists))
-        original_ids = [artist_id_lookup[i] for i in new_artist_list]
-        artist_list = [artist_name_lookup[i] for i in original_ids]
-        print(f"{artist_list}")
-        total_score += average_precision(new_artist_list, masked_artists)
+        recommended_artists = model.recommend_items(masked_user, len(masked_artists))
+        global artist_lookup
+        print(f"{artist_lookup.outputs_to_artists(recommended_artists)=}")
+        total_score += average_precision(recommended_artists, masked_artists)
         average_score = total_score / (i + 1)
         logger.info(f'{i=}\t{total_score=}\t{average_score=}')
     logger.info(f"Tested users {i} in the set of size {test_tensor.size()}")
@@ -65,10 +58,10 @@ def main(config_file):
     config = load_config(config_file)
 
     # If no processed data, create it
-    global artist_id_lookup
-    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'], config['data']['processed_data'])
-    global artist_name_lookup
-    artist_name_lookup = load_csv_to_dict(config['data']['artist_lookup_table'])
+    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
+                                                                       config['data']['processed_data'])
+    global artist_lookup
+    artist_lookup = ArtistLookup(artist_id_lookup, config['data']['artist_lookup_table'])
 
     # Dump matrix to a PNG file - TODO: Requires a dense representation, so memory issues here
     if 'image_dump' in config['data'] and config['data']['image_dump']:
@@ -81,13 +74,7 @@ def main(config_file):
                      f"{'|'.join([k for k in MODEL_CLASSES])}]")
         exit()
 
-    model_path = MODEL_CLASSES.get(model_type)
-    if not model_path:
-        raise ValueError(f"Invalid model type: {model_type}")
-
-    module_path, class_name = model_path.rsplit('.', 1)
-    module = __import__(module_path, fromlist=[class_name])
-    model_class = getattr(module, class_name)
+    model_class = model_factory(model_type)
 
     try:
         num_folds = config['model']['cross_validation_folds']
