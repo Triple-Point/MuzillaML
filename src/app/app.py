@@ -93,7 +93,7 @@ def load_csv_to_dict(file_path):
 
 
 artist_lookup = load_csv_to_dict(ARTIST_LOOKUP)
-
+artist_id_lookup = {}
 
 @app.route('/')
 def index():
@@ -142,7 +142,8 @@ def recommend(user_id):
 
         new_recommendations = model_recommend_items(user['liked_artists'], user['album_count'], ON_SCREEN_ARTISTS)
 
-    return render_template('recommend.html', user_id=user_id, recommendations=new_recommendations)
+    return render_template('recommend.html', user_id=user_id, recommendations=new_recommendations,
+                           liked_artists=user['liked_artists'], disliked_artists=user['disliked_artists'])
 
 
 def model_recommend_items(artist_list, album_count, num):
@@ -151,7 +152,8 @@ def model_recommend_items(artist_list, album_count, num):
     recommended_artists = model.recommend_items_list(artist_list, album_count, num)
     print(f"{recommended_artists=}")
     print(f"{artist_lookup=}")
-    artists = [artist_lookup[i] if i in artist_lookup else "<UNKNOWN_ARTIST>" for i in recommended_artists]
+    print(f"{[artist_id_lookup[i] for i in recommended_artists]}")
+    artists = [artist_lookup[artist_id_lookup[i]] if artist_id_lookup[i] in artist_lookup else "<UNKNOWN_ARTIST>" for i in recommended_artists]
     return artists
 
 
@@ -171,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, required=True, help='Path to config file')
     args = parser.parse_args()
     config = load_config(args.config)
-    user_artist_matrix, user_lookup, artist_lookup_ = load_or_create(config['data']['raw_data'],
+    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
                                                                     config['data']['processed_data'])
     model = CosineModel(user_artist_matrix)
     app.run(debug=True)

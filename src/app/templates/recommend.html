@@ -2,21 +2,68 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recommendations</title>
+    <link rel="stylesheet" href="static/styles.css">
 </head>
 <body>
-    <h1>Recommendations for User {{ user_id }}</h1>
-    <ul>
-        {% for artist in recommendations %}
-            <li>
-                {{ artist }}
-                <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
-                    <input type="hidden" name="artist" value="{{ artist }}">
-                    <button type="submit" name="action" value="like">Thumbs Up</button>
-                    <button type="submit" name="action" value="dislike">Thumbs Down</button>
-                </form>
-            </li>
-        {% endfor %}
-    </ul>
+
+<header>
+    <h1>Music Recommendations</h1>
+</header>
+
+<div class="container">
+    <div class="column">
+        <h2>Recommendations for User {{ user_id }}</h2>
+        <ul>
+            {% for artist in recommendations %}
+                <li>
+                    {{ artist }}
+                    <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
+                        <input type="hidden" name="artist" value="{{ artist }}">
+                        <button type="submit" name="action" value="like">Thumbs Up</button>
+                        <button type="submit" name="action" value="dislike">Thumbs Down</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="column">
+        <h2>Liked Artists</h2>
+        <ul>
+            {% for artist in liked_artists %}
+                <li>
+                    {{ artist }} ({{ artist.album_count }} albums)
+                    <form action="/liked/{{ user_id }}" method="post" style="display:inline;">
+                        <input type="hidden" name="artist" value="{{ artist }}">
+                        <button type="submit" name="action" value="increment">+1</button>
+                        <button type="submit" name="action" value="decrement">-1</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="column">
+        <h2>Disliked Artists</h2>
+        <ul>
+            {% for artist in disliked_artists %}
+                <li>
+                    {{ artist }}
+                    <form action="/disliked/{{ user_id }}" method="post" style="display:inline;">
+                        <input type="hidden" name="artist" value="{{ artist }}">
+                        <button type="submit" name="action" value="delete">Trash</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<footer>
+    <p>© 2025 Triple Point Software. All rights reserved.</p>
+</footer>
+
 </body>
 </html>
