@@ -24,7 +24,7 @@ class RecommenderModel(ABC):
         """
         pass
 
-    def recommend_items_list(self, user: List[int], album_counts = None, topn: int = 10) -> List[int]:
+    def recommend_items_list(self, user: List[int], album_counts=None, topn: int = 10) -> List[int]:
         """
         List-based wrapper for recommend_items
         :param album_counts:
@@ -32,10 +32,10 @@ class RecommenderModel(ABC):
         :param topn:
         :return:
         """
-        indices = [[0]*len(user), user]
+        indices = [[0] * len(user), user]
         if album_counts:
             values = album_counts
         else:
             values = [1] * len(user)
-        user_tensor = torch.sparse_coo_tensor(indices, values, size=(1, 522106), dtype=torch.float64)
+        user_tensor = torch.sparse_coo_tensor(indices, values, size=(1, 522106), dtype=torch.float64).coalesce()
         return self.recommend_items(user_tensor, topn)
