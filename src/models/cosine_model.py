@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class CosineModel(RecommenderModel):
-    def __init__(self, data, artist_id_to_index_map=None):
-        super().__init__(data, artist_id_to_index_map)
+    def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
+        super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
         self.device = getattr(data, "device", torch.device("cpu"))
         # Normalize the data in prep for the cosign similarity calculation. This could take a while...
         self.norm_data = normalize_sparse_tensor(self.data).to(self.device)
@@ -51,18 +51,18 @@ class CosineModel(RecommenderModel):
 
         return top_indices.tolist(), top_scores.tolist()
 
-    def recommend_items(self, user: torch.Tensor, topn: int = 10) -> List[int]:
+    def recommend_items(self, artist_ids: torch.Tensor, topn: int = 10) -> List[int]:
         """
         Recommend an artist for the user based on the most similar user's preferences.
         Args:
-            :param user: User to get recommendation for
+            :param artist_ids: User to get recommendation for
             :param topn: number of recommendations to make
         Returns:
             int: Sorted list of topn recommended artists.
         """
-        norm_user = normalize_sparse_tensor(user).to(self.device)
+        norm_user = normalize_sparse_tensor(artist_ids).to(self.device)
         # Extract user's existing artists
-        user_artists = set(user.indices()[1].tolist())
+        user_artists = set(artist_ids.indices()[1].tolist())
 
         similar_users, _ = self.get_similar_users(norm_user)
 

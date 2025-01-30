@@ -4,8 +4,7 @@ import random
 import argparse
 import json
 
-from src.data.FileUtils import load_or_create, ArtistLookup
-from src.models.cosine_model import CosineModel
+from src.data.FileUtils import ArtistLookup
 from src.models.model_factory import model_factory
 
 app = Flask(__name__)
@@ -101,7 +100,7 @@ def recommend(user_id):
             user['liked_artists'].extend(artist_name_lookup.artists_to_ids([artist]))
             user['album_count'].append(1)
         elif action == 'dislike':
-            user['disliked_artists'].append(artist)
+            user['disliked_artists'].extend(artist_name_lookup.artists_to_ids([artist]))
 
         # Update user preferences
         write_json(FILE_PATH, users)
@@ -137,11 +136,9 @@ def load_config(config_file):
 def main(config):
     global model
     global artist_name_lookup
-    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
-                                                                       config['data']['processed_data'])
     artist_name_lookup = ArtistLookup(config['data']['artist_lookup_table'])
     model_class = model_factory(config['model']['model'])
-    model = model_class(user_artist_matrix, artist_id_lookup)
+    model = model_class.from_files(config['data']['raw_data'], config['data']['processed_data'])
     app.run(debug=True)
 
 

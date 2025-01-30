@@ -11,42 +11,6 @@ else:
     device = "cpu"
 
 
-def create_buckets(sparse_tensor: torch.sparse_coo_tensor, num_buckets: int = 10) -> list[torch.sparse_coo_tensor]:
-    """
-    Distribute the users from a collated torch.sparse_coo_tensor into `num_buckets` tensors cyclically.
-
-    Args:
-        sparse_tensor (torch.sparse_coo_tensor): Input sparse tensor in COO format.
-        num_buckets (int): Number of output tensors (buckets).
-
-    Returns:
-        list: A list of torch.sparse_coo_tensor, one for each bucket.
-    """
-    if not sparse_tensor.is_sparse:
-        raise ValueError(f"Input tensor must be a sparse COO tensor, not {sparse_tensor}")
-    if num_buckets <= 0:
-        raise ValueError(f"num_buckets must be a positive integer. Got: {num_buckets}")
-
-    sub_tensors = []
-
-    for mod_id in range(num_buckets):
-        logger.info(f"Masking for tensor {mod_id}")
-
-        # Get mask for indices[0] % num_sub_tensors == mod_id
-        mask = (sparse_tensor.indices()[0] % num_buckets) == mod_id
-
-        # Slice indices and values
-        sub_indices = sparse_tensor.indices()[:, mask]
-        sub_values = sparse_tensor.values()[mask]
-
-        # Create sub-tensor
-        sub_tensors.append(torch.sparse_coo_tensor(
-            sub_indices, sub_values, sparse_tensor.size(), device=device
-        ).coalesce())
-        logger.info(f"Tensor {mod_id} contains {sub_tensors[-1].indices().shape[1]} non-zero values")
-    return sub_tensors
-
-
 def concatenate_except_one(sub_tensors: list[torch.sparse_coo_tensor], excluded_index: int) -> torch.sparse_coo_tensor:
     """
     Concatenate all tensors except the one at the excluded index.

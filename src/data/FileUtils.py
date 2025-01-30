@@ -1,123 +1,16 @@
 import csv
+import json
 import os
 import pickle
 import logging
 
 import numpy as np
-import pandas as pd
 import torch
 from PIL import Image
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
-    """
-    Loads user-artist interaction data from a CSV file and converts it into a sparse COO tensor.
-
-    Args:
-        data_file (str): Path to the CSV file containing the interaction data.
-                         The file must have the following columns:
-                         - `user_id`: Unique identifier for each user.
-                         - `artist_id`: Unique identifier for each artist.
-                         - `album_count`: Interaction count (e.g., number of albums listened to).
-
-    Returns:
-        torch.Tensor: A PyTorch sparse COO tensor with:
-                      - Indices representing `user_id` and `artist_id`.
-                      - Values representing the `album_count`.
-                      - Size derived from the maximum `user_id` and `artist_id` values.
-
-    Raises:
-        FileNotFoundError: If the specified CSV file does not exist.
-        KeyError: If the required columns (`user_id`, `artist_id`, `album_count`) are missing.
-        ValueError: If the data contains invalid or unexpected values (e.g., negative counts).
-
-    Notes:
-        - The function uses categorical encoding to convert `user_id` and `artist_id` into integer indices.
-        - The resulting tensor is moved to the current device (`cpu` or `cuda`) as determined by PyTorch.
-
-    Example:
-        ```python
-        sparse_tensor = load_data("user_artist_interactions.csv")
-        print(sparse_tensor)
-        ```
-
-    Logging:
-        - Logs information about the processing stages (loading data, creating tensor, etc.).
-
-    """
-    if not os.path.exists(data_file):
-        raise FileNotFoundError(f"Data file {data_file} not found.")
-
-    df = pd.read_csv(data_file, header=None, names=['user_id', 'artist_id', 'album_count'])
-
-    user_ids = df['user_id'].unique().tolist()
-    artist_ids = df['artist_id'].unique().tolist()
-
-    # Create dictionaries to map original IDs to new indices
-    # TODO: artist names are not unique!!!
-    user_id_to_index_map = {original_id: index for index, original_id in enumerate(user_ids)}
-    artist_id_to_index_map = {original_id: index for index, original_id in enumerate(artist_ids)}
-
-    # Replace original IDs with new indices in the dataframe
-    df['user_index'] = df['user_id'].map(user_id_to_index_map)
-    df['artist_index'] = df['artist_id'].map(artist_id_to_index_map)
-
-    # Extract indices and values
-    indices = [df['user_index'].values, df['artist_index'].values]
-    values = df['album_count'].values
-
-    # Create sparse tensor
-    tensor = torch.sparse_coo_tensor(indices, values).coalesce()
-
-    return tensor, user_id_to_index_map, artist_id_to_index_map
-
-
-def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
-    """
-    Loads a preprocessed sparse matrix from disk or creates it from raw data if necessary.
-
-    Args:
-        raw_data_file (str): Path to the raw data file (e.g., a CSV file) containing user-artist interactions.
-        sparse_data_file (str): Path to the serialized sparse matrix file (e.g., a `.pkl` file).
-        force_reprocess (bool, optional): If `True`, reprocess the raw data file even if the serialized file exists.
-                                          Defaults to `False`.
-
-    Returns:
-        torch.Tensor: A sparse tensor representing the user-artist interaction matrix.
-
-    Raises:
-        FileNotFoundError: If `raw_data_file` does not exist when reprocessing is required.
-        ValueError: If the deserialized sparse matrix is incompatible with the current system or corrupted.
-
-    Notes:
-        - The sparse matrix is serialized and deserialized using the `pickle` module.
-        - The function moves the sparse tensor to the current device (`cpu` or `cuda`) as determined by PyTorch.
-
-    Example:
-        ```python
-        sparse_matrix = load_or_create(
-            raw_data_file="user_artist_data.csv",
-            sparse_data_file="user_artist_matrix.pkl",
-            force_reprocess=True
-        )
-        print(sparse_matrix)
-        ```
-    """
-    if force_reprocess or not os.path.isfile(sparse_data_file):
-        logger.info(f"Reprocessing data from {raw_data_file}")
-        sparse_matrix, user_id_to_index_map, artist_id_to_index_map = load_data(raw_data_file)
-        with open(sparse_data_file, "wb") as f:
-            pickle.dump((sparse_matrix, user_id_to_index_map, artist_id_to_index_map), f)
-    else:
-        logger.info(f"Loading data from file {sparse_data_file}")
-        with open(sparse_data_file, "rb") as f:
-            sparse_matrix, user_id_to_index_map, artist_id_to_index_map = pickle.load(f)
-    return sparse_matrix, user_id_to_index_map, artist_id_to_index_map
 
 
 def dump_to_image(user_artist_matrix: torch.sparse_coo_tensor, out_file_name: str, show_image=False):
@@ -177,14 +70,34 @@ def load_csv_to_dict(file_path):
 class ArtistLookup:
     def __init__(self, name_file: str):
         self.id_to_artist = load_csv_to_dict(name_file)
-        self.artist_to_id = {output: index for index, output in self.id_to_artist.items()}
+
+        # Create a dictionary to keep track of occurrences of each artist name
+        artist_count = {}
+
+        for key, value in self.id_to_artist.items():
+            if value in artist_count:
+                artist_count[value] += 1
+                # Append ZWSP based on occurrence count
+                self.id_to_artist[key] = value + '​' * artist_count[value]
+            else:
+                artist_count[value] = 0
+        self.artist_to_id = {value: key for key, value in self.id_to_artist.items()}
+
+        return
+
+        # Dump to file for debug purposes
+        with open("data/id_to_artist.json", "w") as outfile:
+            json.dump(self.id_to_artist, outfile)
+        with open("data/artist_to_id.json", "w") as outfile:
+            json.dump(self.artist_to_id, outfile)
 
     def artists_to_ids(self, artists: list[str]) -> list[int]:
         return [
             self.artist_to_id[artist] if artist in self.artist_to_id else -1 for artist in artists
         ]
 
-    def ids_to_artists(self, ids:list[int]) -> list[str]:
+    def ids_to_artists(self, ids: list[int]) -> list[str]:
+        # TODO: artist names are not unique!!! Do not use this function!!!
         return [
             self.id_to_artist[i] if i in self.id_to_artist else "<???>" for i in ids
         ]
