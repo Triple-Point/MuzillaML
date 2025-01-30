@@ -12,6 +12,9 @@ from src.models.model_factory import MODEL_CLASSES, model_factory
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+DEBUG_UI = True
+if DEBUG_UI:
+    artist_lookup = {}
 
 def load_config(config_file):
     try:
@@ -23,8 +26,6 @@ def load_config(config_file):
     except yaml.YAMLError as e:
         raise ValueError(f"Error parsing YAML file: {e}")
 
-
-artist_lookup = {}
 
 
 def evaluate(model, test_tensor):
@@ -45,8 +46,12 @@ def evaluate(model, test_tensor):
         masked_user, masked_artists = remove_random_values(user)
         # Generate the top-n artists
         recommended_artists = model.recommend_items(masked_user, len(masked_artists))
-        global artist_lookup
-        print(f"{artist_lookup.outputs_to_artists(recommended_artists)=}")
+        if DEBUG_UI:
+            # recommended_artists is in indecs. To get the name, we need the original ID
+            global artist_lookup
+            id_list = [model.artist_index_to_id_map[i] for i in recommended_artists]
+            print(f"{id_list=}")
+            print(f"{artist_lookup.ids_to_artists(id_list)}")
         total_score += average_precision(recommended_artists, masked_artists)
         average_score = total_score / (i + 1)
         logger.info(f'{i=}\t{total_score=}\t{average_score=}')
@@ -58,10 +63,12 @@ def main(config_file):
     config = load_config(config_file)
 
     # If no processed data, create it
-    user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
+    user_artist_matrix, user_id_to_index_map, artist_id_to_index_map = load_or_create(config['data']['raw_data'],
                                                                        config['data']['processed_data'])
-    global artist_lookup
-    artist_lookup = ArtistLookup(artist_id_lookup, config['data']['artist_lookup_table'])
+
+    if DEBUG_UI:
+        global artist_lookup
+        artist_lookup = ArtistLookup(config['data']['artist_lookup_table'])
 
     # Dump matrix to a PNG file - TODO: Requires a dense representation, so memory issues here
     if 'image_dump' in config['data'] and config['data']['image_dump']:
@@ -94,7 +101,10 @@ def main(config_file):
         train_tensor = concatenate_except_one(user_buckets, i)
         # Make a model on the train data
         logger.debug(f"Creating model")
-        model = model_class(train_tensor)
+        if DEBUG_UI:
+            model = model_class(train_tensor, artist_id_to_index_map)
+        else:
+            model = model_class(train_tensor)
         logger.debug(f"About to evaluate")
         score = evaluate(model, test_tensor)
         eval_scores.append(score)

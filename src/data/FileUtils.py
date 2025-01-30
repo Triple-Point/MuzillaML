@@ -55,16 +55,17 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
 
     df = pd.read_csv(data_file, header=None, names=['user_id', 'artist_id', 'album_count'])
 
-    user_ids = df['user_id'].unique()
-    artist_ids = df['artist_id'].unique()
+    user_ids = df['user_id'].unique().tolist()
+    artist_ids = df['artist_id'].unique().tolist()
 
     # Create dictionaries to map original IDs to new indices
-    user_id_map = {original_id: index for index, original_id in enumerate(user_ids)}
-    artist_id_map = {original_id: index for index, original_id in enumerate(artist_ids)}
+    # TODO: artist names are not unique!!!
+    user_id_to_index_map = {original_id: index for index, original_id in enumerate(user_ids)}
+    artist_id_to_index_map = {original_id: index for index, original_id in enumerate(artist_ids)}
 
     # Replace original IDs with new indices in the dataframe
-    df['user_index'] = df['user_id'].map(user_id_map)
-    df['artist_index'] = df['artist_id'].map(artist_id_map)
+    df['user_index'] = df['user_id'].map(user_id_to_index_map)
+    df['artist_index'] = df['artist_id'].map(artist_id_to_index_map)
 
     # Extract indices and values
     indices = [df['user_index'].values, df['artist_index'].values]
@@ -73,7 +74,7 @@ def load_data(data_file: str) -> tuple[torch.sparse_coo_tensor, dict[int, int], 
     # Create sparse tensor
     tensor = torch.sparse_coo_tensor(indices, values).coalesce()
 
-    return tensor, user_id_map, artist_id_map
+    return tensor, user_id_to_index_map, artist_id_to_index_map
 
 
 def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: bool = False) -> tuple[torch.sparse_coo_tensor, dict[int, int], dict[int, int]]:
@@ -109,14 +110,14 @@ def load_or_create(raw_data_file: str, sparse_data_file: str, force_reprocess: b
     """
     if force_reprocess or not os.path.isfile(sparse_data_file):
         logger.info(f"Reprocessing data from {raw_data_file}")
-        sparse_matrix, user_id_map, artist_id_map = load_data(raw_data_file)
+        sparse_matrix, user_id_to_index_map, artist_id_to_index_map = load_data(raw_data_file)
         with open(sparse_data_file, "wb") as f:
-            pickle.dump((sparse_matrix, user_id_map, artist_id_map), f)
+            pickle.dump((sparse_matrix, user_id_to_index_map, artist_id_to_index_map), f)
     else:
         logger.info(f"Loading data from file {sparse_data_file}")
         with open(sparse_data_file, "rb") as f:
-            sparse_matrix, user_id_map, artist_id_map = pickle.load(f)
-    return sparse_matrix, user_id_map, artist_id_map
+            sparse_matrix, user_id_to_index_map, artist_id_to_index_map = pickle.load(f)
+    return sparse_matrix, user_id_to_index_map, artist_id_to_index_map
 
 
 def dump_to_image(user_artist_matrix: torch.sparse_coo_tensor, out_file_name: str, show_image=False):
@@ -174,16 +175,9 @@ def load_csv_to_dict(file_path):
 
 
 class ArtistLookup:
-    def __init__(self, artist_id_lookup: dict[int, int], name_file: str):
+    def __init__(self, name_file: str):
         self.id_to_artist = load_csv_to_dict(name_file)
         self.artist_to_id = {output: index for index, output in self.id_to_artist.items()}
-        self.output_to_id = artist_id_lookup
-        self.id_to_output = {output: index for index, output in self.output_to_id.items()}
-
-    def outputs_to_artists(self, output: list[int]):
-        original_ids = [self.output_to_id[i] for i in output]
-        artist_list = [self.id_to_artist[i] for i in original_ids]
-        return artist_list
 
     def artists_to_ids(self, artists: list[str]) -> list[int]:
         return [

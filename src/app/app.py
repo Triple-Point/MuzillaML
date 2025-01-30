@@ -118,7 +118,7 @@ def model_recommend_items(artist_list: list[int], album_count: list[int], num: i
     print(f"{artist_list=}")
     recommended_artists = model.recommend_items_list(artist_list, album_count, num)
     global artist_name_lookup
-    artist_strings = artist_name_lookup.outputs_to_artists(recommended_artists)
+    artist_strings = artist_name_lookup.ids_to_artists(recommended_artists)
     print(f"{artist_strings=}")
     return artist_strings
 
@@ -139,9 +139,9 @@ def main(config):
     global artist_name_lookup
     user_artist_matrix, user_lookup, artist_id_lookup = load_or_create(config['data']['raw_data'],
                                                                        config['data']['processed_data'])
-    artist_name_lookup = ArtistLookup(artist_id_lookup, config['data']['artist_lookup_table'])
+    artist_name_lookup = ArtistLookup(config['data']['artist_lookup_table'])
     model_class = model_factory(config['model']['model'])
-    model = model_class(user_artist_matrix)
+    model = model_class(user_artist_matrix, artist_id_lookup)
     app.run(debug=True)
 
 

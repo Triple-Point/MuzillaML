@@ -11,10 +11,10 @@ model = CosineModel(test_data)
 
 # Same user#0, but missing artist #2
 user = [0, 1, 0, 0, 3, 4]
-new_artist = model.recommend_artist(csr_to_torch_sparse_tensor(csr_matrix(user)))
+new_artist = model.recommend_items(csr_to_torch_sparse_tensor(csr_matrix(user)))
 print(new_artist)
 
 # Similar to user#1, but missing artist #3
 user = [4, 0, 3, 0, 1, 1]
-new_artist = model.recommend_artist(csr_to_torch_sparse_tensor(csr_matrix(user)))
+new_artist = model.recommend_items(csr_to_torch_sparse_tensor(csr_matrix(user)))
 print(new_artist)

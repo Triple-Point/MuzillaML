@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class PopularityModel(RecommenderModel):
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, data, artist_id_to_index_map=None):
+        super().__init__(data, artist_id_to_index_map)
         # Get the artist indices (second row of the indices' tensor)
         artist_indices = self.data.indices()[1]
 

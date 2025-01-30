@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class CosineModel(RecommenderModel):
-    def __init__(self, data):
-        super().__init__(data)
+    def __init__(self, data, artist_id_to_index_map=None):
+        super().__init__(data, artist_id_to_index_map)
         self.device = getattr(data, "device", torch.device("cpu"))
         # Normalize the data in prep for the cosign similarity calculation. This could take a while...
         self.norm_data = normalize_sparse_tensor(self.data).to(self.device)
@@ -23,7 +23,7 @@ class CosineModel(RecommenderModel):
         """
         Compute cosine similarity using sparse tensors.
         Args:
-            norm_tensor (Tensor): Normalized user tensor.
+            norm_tensor (Tensor): Normalized artist_ids tensor.
         Returns:
             Tensor: Cosine similarity tensor.
         """
