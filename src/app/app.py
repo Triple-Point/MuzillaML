@@ -83,39 +83,52 @@ def recommend(user_id):
     if user_id not in users:
         users[user_id] = {
             'liked_artists': [],
-            'album_count': [],
+            'album_counts': [],
             'disliked_artists': []
         }
     user = users[user_id]
 
     # Call your recommendation model to get a list of new artists
-    new_recommendations = model_recommend_items(user['liked_artists'], user['album_count'], ON_SCREEN_ARTISTS)
+    new_recommendations = model_recommend_items(user['liked_artists'], user['album_counts'], ON_SCREEN_ARTISTS, user['disliked_artists'])
     print(f"{new_recommendations=}")
     global artist_name_lookup
 
     if request.method == 'POST':
         artist = request.form['artist']
         action = request.form['action']
+        artist_id = artist_name_lookup.artists_to_ids([artist])[0]
         if action == 'like':
-            user['liked_artists'].extend(artist_name_lookup.artists_to_ids([artist]))
-            user['album_count'].append(1)
+            user['liked_artists'].append(artist_id)
+            user['album_counts'].append(1)
         elif action == 'dislike':
-            user['disliked_artists'].extend(artist_name_lookup.artists_to_ids([artist]))
+            user['disliked_artists'].append(artist_id)
+        elif action == 'increment':
+            i = user['liked_artists'].index(artist_id)
+            user['album_counts'][i] += 1
+        elif action == 'decrement':
+            i = user['liked_artists'].index(artist_id)
+            if user['album_counts'][i] == 1:
+                del user['album_counts'][i]
+                del user['liked_artists'][i]
+            else:
+                user['album_counts'][i] -= 1
+        elif action == 'delete':
+            user['disliked_artists'].remove(artist_id)
 
         # Update user preferences
         write_json(FILE_PATH, users)
 
-        new_recommendations = model_recommend_items(user['liked_artists'], user['album_count'], ON_SCREEN_ARTISTS)
+        new_recommendations = model_recommend_items(user['liked_artists'], user['album_counts'], ON_SCREEN_ARTISTS, user['disliked_artists'])
     liked_strings = artist_name_lookup.ids_to_artists(user['liked_artists'])
     disliked_strings = artist_name_lookup.ids_to_artists(user['disliked_artists'])
 
     return render_template('recommend.html', user_id=user_id, recommendations=new_recommendations,
-                           liked_artists=liked_strings, disliked_artists=disliked_strings)
+                           liked_artists=liked_strings, album_counts=user['album_counts'], disliked_artists=disliked_strings)
 
 
-def model_recommend_items(artist_list: list[int], album_count: list[int], num: int) -> list[str]:
+def model_recommend_items(artist_list: list[int], album_counts: list[int], num: int, excluded_artists:list[int]) -> list[str]:
     print(f"{artist_list=}")
-    recommended_artists = model.recommend_items_list(artist_list, album_count, num)
+    recommended_artists = model.recommend_items_list(artist_list, album_counts, num, excluded_artists)
     global artist_name_lookup
     artist_strings = artist_name_lookup.ids_to_artists(recommended_artists)
     print(f"{artist_strings=}")
