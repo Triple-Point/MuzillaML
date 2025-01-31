@@ -124,5 +124,6 @@ class RecommenderModel(ABC):
         # TODO Nagic Mumber!!
         user_tensor = torch.sparse_coo_tensor(indices, values, size=(1, 522106), dtype=torch.float64).coalesce()
         recommendations = self.recommend_items(user_tensor, topn + len(excluded_artists))
-        artist_list = [self.artist_index_to_id_map[r] for r in recommendations if r not in excluded_artists]
-        return artist_list
+        recommended_ids = [self.artist_index_to_id_map[r] for r in recommendations]
+        artist_list = [r for r in recommended_ids if r not in excluded_artists]
+        return artist_list[:topn]
