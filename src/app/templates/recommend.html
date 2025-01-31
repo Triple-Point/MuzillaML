@@ -34,8 +34,8 @@
         <ul>
             {% for artist in liked_artists %}
                 <li>
-                    {{ artist }} ({{ artist.album_count }} albums)
-                    <form action="/liked/{{ user_id }}" method="post" style="display:inline;">
+                    {{ artist }} - ({{ album_counts[loop.index0] }} albums)
+                    <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
                         <input type="hidden" name="artist" value="{{ artist }}">
                         <button type="submit" name="action" value="increment">+1</button>
                         <button type="submit" name="action" value="decrement">-1</button>
@@ -51,7 +51,7 @@
             {% for artist in disliked_artists %}
                 <li>
                     {{ artist }}
-                    <form action="/disliked/{{ user_id }}" method="post" style="display:inline;">
+                    <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
                         <input type="hidden" name="artist" value="{{ artist }}">
                         <button type="submit" name="action" value="delete">Trash</button>
                     </form>
