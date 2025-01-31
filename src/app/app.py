@@ -36,12 +36,11 @@ def recommend(user_id):
 
     # Call your recommendation model to get a list of new artists
     new_recommendations = model.recommend_items(user['liked_artists'], user['album_counts'], ON_SCREEN_ARTISTS, user['disliked_artists'])
-    global artist_name_lookup
 
     if request.method == 'POST':
         artist = request.form['artist']
         action = request.form['action']
-        artist_id = artist_name_lookup.artists_to_ids([artist])[0]
+        artist_id = model.artist_name_lookup.artists_to_ids([artist])[0]
         if action == 'like':
             user['liked_artists'].append(artist_id)
             user['album_counts'].append(1)
@@ -64,8 +63,8 @@ def recommend(user_id):
         user_db.write_json()
 
         new_recommendations = model.recommend_items(user['liked_artists'], user['album_counts'], ON_SCREEN_ARTISTS, user['disliked_artists'])
-    liked_strings = artist_name_lookup.ids_to_artists(user['liked_artists'])
-    disliked_strings = artist_name_lookup.ids_to_artists(user['disliked_artists'])
+    liked_strings = model.artist_name_lookup.ids_to_artists(user['liked_artists'])
+    disliked_strings = model.artist_name_lookup.ids_to_artists(user['disliked_artists'])
 
     return render_template('recommend.html', user_id=user_id, recommendations=new_recommendations,
                            liked_artists=liked_strings, album_counts=user['album_counts'], disliked_artists=disliked_strings)
@@ -84,7 +83,7 @@ def load_config(config_file):
 
 def main(config):
     global model
-    model = WebRecommender(config['model']['artist_lookup_table'], config['model']['model'], config['data']['raw_data'], config['data']['processed_data'])
+    model = WebRecommender(config['data']['artist_lookup_table'], config['model']['model'], config['data']['raw_data'], config['data']['processed_data'])
     global user_db
     user_db = UserDatabase(config['data']['app_users'])
     app.run(debug=True)
