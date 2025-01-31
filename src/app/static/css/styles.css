@@ -1,0 +1,50 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+header, footer {
+    width: 100%;
+    padding: 20px;
+    background-color: #f1f1f1;
+    text-align: center;
+}
+
+.container {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px auto;
+    width: 90%;
+}
+
+.column {
+    flex: 1;
+    margin: 0 10px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    width: 33%;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+td {
+    border: none;
+    padding: 5px;
+    text-align: center;
+}
+
+td:first-child {
+    padding-right: 20px; /* Add space only to the first column */
+}
+
+td form {
+    display: inline-block;
+    margin: 0;
+}
+
+.button-cell {
+    width: 80px; /* Adjust this width as needed */
+}

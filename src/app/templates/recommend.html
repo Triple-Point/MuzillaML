@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recommendations</title>
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
 
@@ -15,49 +15,76 @@
 <div class="container">
     <div class="column">
         <h2>Recommendations for User {{ user_id }}</h2>
-        <ul>
+        <table>
             {% for artist in recommendations %}
-                <li>
-                    {{ artist }}
+            <tr>
+                <td>{{ artist }}</td>
+                <td>
                     <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
                         <input type="hidden" name="artist" value="{{ artist }}">
-                        <button type="submit" name="action" value="like">Thumbs Up</button>
-                        <button type="submit" name="action" value="dislike">Thumbs Down</button>
+                        <button type="submit" name="action" value="like">
+                            <img src="{{ url_for('static', filename='icons/thumbs_up.png') }}" alt="Thumbs Up" width="16" height="16"/>
+                        </button>
                     </form>
-                </li>
+                </td>
+                <td>
+                    <form action="/recommend/{{ user_id }}" method="post">
+                        <input type="hidden" name="artist" value="{{ artist }}">
+                        <button type="submit" name="action" value="dislike">
+                            <img src="{{ url_for('static', filename='icons/thumbs_down.png') }}" alt="Thumbs Down" width="16" height="16"/>
+                        </button>
+                    </form>
+                </td>
+            </tr>
             {% endfor %}
-        </ul>
+        </table>
     </div>
 
     <div class="column">
         <h2>Liked Artists</h2>
-        <ul>
+        <table>
             {% for artist in liked_artists %}
-                <li>
-                    {{ artist }} - ({{ album_counts[loop.index0] }} albums)
+            <tr>
+                <td> {{ artist }} - ({{ album_counts[loop.index0] }} albums)</td>
+                <td>
                     <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
                         <input type="hidden" name="artist" value="{{ artist }}">
-                        <button type="submit" name="action" value="increment">+1</button>
-                        <button type="submit" name="action" value="decrement">-1</button>
+                        <button type="submit" name="action" value="increment">
+                            <img src="{{ url_for('static', filename='icons/plus_one.png') }}" alt="Plus One" width="16" height="16"/>
+                        </button>
                     </form>
-                </li>
+                </td>
+                <td>
+                    <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
+                        <input type="hidden" name="artist" value="{{ artist }}">
+                        <button type="submit" name="action" value="decrement"><img
+                                src="{{ url_for('static', filename='icons/minus_one.png') }}" alt="Minus One" width="16"
+                                height="16"/></button>
+                    </form>
+                </td>
+            </tr>
             {% endfor %}
-        </ul>
+        </table>
     </div>
 
     <div class="column">
         <h2>Disliked Artists</h2>
-        <ul>
+        <table>
             {% for artist in disliked_artists %}
-                <li>
+            <tr>
+                <td>
                     {{ artist }}
+                </td>
+                <td>
                     <form action="/recommend/{{ user_id }}" method="post" style="display:inline;">
                         <input type="hidden" name="artist" value="{{ artist }}">
-                        <button type="submit" name="action" value="delete">Trash</button>
+                        <button type="submit" name="action" value="delete"><img
+                                src="{{ url_for('static', filename='icons/trash.png') }}" alt="Trash" width="16"
+                                height="16"/></button>
                     </form>
-                </li>
-            {% endfor %}
-        </ul>
+                </td>
+                {% endfor %}
+        </table>
     </div>
 </div>
 
