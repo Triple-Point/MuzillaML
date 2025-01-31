@@ -67,7 +67,7 @@ class CrossValidator(RecommenderModel):
             train_tensor = concatenate_except_one(self.buckets, i)
             # Make a model on the train data
             logger.debug(f"Creating model")
-            # TODO: Need to inject the data directly into the model
+            # Inject the data directly into the model
             model = model_class(train_tensor, self.user_id_to_index_map, self.artist_id_to_index_map)
             logger.debug(f"About to evaluate")
             score = evaluate_model(model, test_tensor)

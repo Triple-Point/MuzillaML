@@ -97,7 +97,6 @@ class ArtistLookup:
         ]
 
     def ids_to_artists(self, ids: list[int]) -> list[str]:
-        # TODO: artist names are not unique!!! Do not use this function!!!
         return [
             self.id_to_artist[i] if i in self.id_to_artist else "<???>" for i in ids
         ]

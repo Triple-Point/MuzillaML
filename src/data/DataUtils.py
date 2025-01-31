@@ -12,13 +12,15 @@ else:
 logger.info(f"Using device: {device}")
 
 
-def remove_random_values(user_tensor: torch.sparse_coo_tensor, num_remove: int = 10, seed: int = None) -> tuple[torch.sparse_coo_tensor, list[int]]:
+def remove_random_values(user_tensor: torch.sparse_coo_tensor, num_remove: int = 10,
+                         seed: int = None) -> tuple[torch.sparse_coo_tensor, list[int]]:
     """
     Remove random non-zero values from a sparse COO tensor.
 
     Args:
         user_tensor (torch.sparse_coo_tensor): Input sparse COO tensor.
-        num_remove (int): Number of random values to remove. Default 10. Note: A maximum of 10% of the items will be removed
+        num_remove (int): Number of random values to remove. Default 10.
+            Note: A maximum of 10% of the items will be removed
         seed (int, optional): Random seed for reproducibility.
 
     Returns:

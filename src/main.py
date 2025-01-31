@@ -40,7 +40,7 @@ def main(config_file):
     cross_validator = CrossValidator.from_files(config['data']['raw_data'], config['data']['processed_data'])
     cross_validator.set_cross_validation_params(model_type, num_folds)
 
-    # Dump matrix to a PNG file - TODO: Requires a dense representation, so memory issues here
+    # Dump matrix to a PNG file - Requires a dense representation, so memory issues here. Use at own risk
     if 'image_dump' in config['data'] and config['data']['image_dump']:
         dump_to_image(cross_validator.data, config['data']['image_dump'])
 
