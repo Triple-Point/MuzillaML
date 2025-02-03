@@ -83,7 +83,7 @@ class RecommenderModel(ABC):
         """
         if force_reprocess or not os.path.isfile(sparse_data_filename):
             logger.info(f"Reprocessing data from {raw_data_filename}")
-            data, user_id_to_index_map, artist_id_to_index_map = load_raw_data(raw_data_filename)
+            data, user_id_to_index_map, artist_id_to_index_map = RecommenderModel.load_raw_data(raw_data_filename)
             with open(sparse_data_filename, "wb") as f:
                 pickle.dump(
                     (data, user_id_to_index_map, artist_id_to_index_map), f)
