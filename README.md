@@ -126,10 +126,10 @@ The most popular artist is ranked higher.
 ## Results
 
 | Model               | MAP@10 |
-|---------------------|-------|
-| Random Selection    | 0.00  |
-| Popularity Matching | 0.01  |
-| Cosine Similarity   | 0.10  | 
+|---------------------|--------|
+| Random Selection    | 0.00   |
+| Popularity Matching | 0.01   |
+| Cosine Similarity   | 0.10   | 
 
 ### Serendipity 
 

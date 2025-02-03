@@ -45,6 +45,9 @@ def evaluate_model(model, test_tensor):
 class CrossValidator(RecommenderModel):
     def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
         super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
+        self.model_type = ""
+        self.num_folds = -1
+        self.buckets = []
 
     def set_cross_validation_params(self, model_type, num_folds):
         self.model_type = model_type
@@ -80,8 +83,6 @@ class CrossValidator(RecommenderModel):
         """
         if self.num_folds <= 0:
             raise ValueError(f"{self.num_folds=} but must be a positive integer. Got: ")
-
-        self.buckets = []
 
         for mod_id in range(self.num_folds):
             logger.info(f"Masking for tensor {mod_id}")

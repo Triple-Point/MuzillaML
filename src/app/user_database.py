@@ -12,37 +12,34 @@ def default_user():
 
 class UserDatabase:
     def __init__(self, file_path):
+        """
+        Args:
+            file_path (str): Path to the JSON file.
+        """
         self.file_path = file_path
         self.users = defaultdict(default_user)
 
-    def read_json(self):
+    def read_json(self) -> bool:
         """
         Reads the JSON file and returns the data as a Python dictionary.
 
-        Args:
-            file_path (str): Path to the JSON file.
-
         Returns:
-            dict: Data from the JSON file.
+            bool: True if the data was read successfully, False otherwise.
         """
         try:
             with open(self.file_path, 'r') as file:
                 self.users = json.load(file)
+                return True
         except FileNotFoundError:
             print(f"File not found: {self.file_path}. Returning an empty dictionary.")
-            return {}
+            return False
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}. Returning an empty dictionary.")
-            return {}
+            return False
 
-    def write_json(self):
+    def write_json(self) -> bool:
         """
         Writes a Python dictionary to a JSON file.
-
-        Args:
-            file_path (str): Path to the JSON file.
-            data (dict): Data to write to the JSON file.
-
         Returns:
             bool: True if the data was written successfully, False otherwise.
         """

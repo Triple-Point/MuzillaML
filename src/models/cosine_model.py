@@ -69,7 +69,7 @@ class CosineModel(RecommenderModel):
         recommendations = []
         for similar_user in similar_users:
             similar_artists, _ = get_sorted_artists(similar_user, self.data)
-            new_recommendations = [idx for idx in similar_artists.tolist() if idx not in user_artists]
+            new_recommendations = [idx for idx in similar_artists if idx not in user_artists]
             recommendations.extend(new_recommendations)
             if len(recommendations) >= topn:
                 return recommendations[:topn]

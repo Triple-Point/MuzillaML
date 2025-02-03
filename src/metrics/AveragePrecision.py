@@ -24,6 +24,7 @@ def average_precision(relevant_items, retrieved_items):
     # MAP is the mean of the average precisions for all relevant items
     return sum(average_precisions) / len(relevant_items) if relevant_items else 0.0
 
+
 if __name__ == "__main__":
     # Some test cases
     test_cases = [
@@ -48,13 +49,14 @@ if __name__ == "__main__":
         {
             "relevant_items": [0, 4, 2, 9, 8, 7, 1, 3, 5, 6],
             "retrieved_items": [6, 11, 2, 13, 8, 17, 1, 13, 5, 10],
-            "expected": (1+2/3+3/5+4/7+5/9)/10,
+            "expected": (1 + 2 / 3 + 3 / 5 + 4 / 7 + 5 / 9) / 10,
             "description": "Partial Overlap"
         }
     ]
 
     for case in test_cases:
         result = average_precision(case["relevant_items"], case["retrieved_items"])
-        assert abs(result - case["expected"]) < 1e-2, f"Failed {case['description']}: expected {case['expected']} but got {result}"
+        assert abs(result - case[
+            "expected"]) < 1e-2, f"Failed {case['description']}: expected {case['expected']} but got {result}"
 
     print("All test cases passed!")
