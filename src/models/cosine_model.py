@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import logging
 
-from src.data.TensorUtils import normalize_sparse_tensor
+from src.data.TensorUtils import normalize_L1_sparse_tensor, normalize_L2_sparse_tensor
 from src.data.DataUtils import get_sorted_artists
 from src.models.recommender_model import RecommenderModel
 
@@ -16,8 +16,8 @@ class CosineModel(RecommenderModel):
     def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
         super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
         self.device = getattr(data, "device", torch.device("cpu"))
-        # Normalize the data in prep for the cosign similarity calculation. This could take a while...
-        self.norm_data = normalize_sparse_tensor(self.data).to(self.device)
+        # Normalize the data in prep for the cosine similarity calculation.
+        self.norm_data = normalize_L2_sparse_tensor(self.data).to(self.device)
 
     def sparse_cosine_similarity(self, norm_tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -60,7 +60,7 @@ class CosineModel(RecommenderModel):
         Returns:
             int: Sorted list of topn recommended artists.
         """
-        norm_user = normalize_sparse_tensor(artist_ids).to(self.device)
+        norm_user = normalize_L1_sparse_tensor(artist_ids).to(self.device)
         # Extract user's existing artists
         user_artists = set(artist_ids.indices()[1].tolist())
 

@@ -104,7 +104,31 @@ def get_all_users(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_te
 
 
 # Normalize sparse tensor row-wise
-def normalize_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
+def normalize_L1_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
+    """
+    Performs row-wise L1 normalization (each row sums to 1) for a sparse matrix.
+
+    :param sparse_tensor: Input torch.sparse_coo_tensor of shape (num_rows, num_cols).
+    :return: Row-normalized sparse tensor where each row sums to 1.
+    """
+    device = sparse_tensor.device
+    indices = sparse_tensor.indices()
+    values = sparse_tensor.values()
+
+    # Compute row sum (L1 norm for each row)
+    row_sums = torch.sparse.sum(sparse_tensor, dim=1).to_dense()  # Shape: (num_rows,)
+
+    # Prevent division by zero (for rows with all zeros)
+    row_sums = row_sums.clamp(min=1e-8)  # Avoid NaN
+
+    # Normalize values (divide each element by its corresponding row sum)
+    normalized_values = values / row_sums[indices[0]]  # Use row indices to index row_sums
+
+    # Construct new sparse tensor
+    return torch.sparse_coo_tensor(indices, normalized_values, sparse_tensor.shape, device=device)
+
+
+def normalize_L2_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.sparse_coo_tensor:
     if not sparse_tensor.is_sparse:
         raise ValueError(f"Input tensor must be a sparse COO tensor, not {sparse_tensor}")
 
@@ -122,3 +146,27 @@ def normalize_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.spa
 
     # Normalize rows of the sparse tensor
     return torch.sparse.mm(norm_diagonal, sparse_tensor)
+
+
+def dense_to_sparse(dense_matrix):
+    # Explicitly construct the indices and values for demonstration purposes
+    # Expects a 2D input
+    indices = [[], []]
+    values = []
+    num_users = len(dense_matrix)
+    num_artists = 0
+    for row, user_data in enumerate(dense_matrix):
+        for column, artist_count in enumerate(user_data):
+            if artist_count > 0:
+                indices[0].append(row)
+                indices[1].append(column)
+                values.append(artist_count)
+            if num_artists <= column:
+                num_artists = column + 1
+    return torch.sparse_coo_tensor(indices, values, (num_users, num_artists)).coalesce()
+
+
+if __name__ == "__main__":
+    un_norm = dense_to_sparse([[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3]])
+    norm = normalize_L1_sparse_tensor(un_norm).to_dense()
+    logger.info(norm)
