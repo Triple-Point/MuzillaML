@@ -130,6 +130,8 @@ The most popular artist is ranked higher.
 | Random Selection    | 0.00   |
 | Popularity Matching | 0.01   |
 | Cosine Similarity   | 0.10   | 
+| TF-IDF              | 0.025  |
+
 
 ### Serendipity 
 
