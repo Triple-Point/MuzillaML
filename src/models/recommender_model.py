@@ -2,6 +2,7 @@ import logging
 import os
 import pickle
 from abc import ABC, abstractmethod
+from src.data.DataUtils import get_sorted_artists
 
 import torch
 import pandas as pd
@@ -132,3 +133,46 @@ class RecommenderModel(ABC):
         recommended_ids = [self.artist_index_to_id_map[r] for r in recommendations] if self.artist_index_to_id_map else recommendations
         artist_list = [r for r in recommended_ids if r not in excluded_artists]
         return artist_list[:topn]
+
+
+class SimilarUserRecommender(RecommenderModel):
+    @abstractmethod
+    def get_similar_users(self, user: torch.Tensor) -> tuple[list[int], list[float]]:
+        """
+        Compute the indices and similarity values of the most similar users based on cosine similarity.
+
+        Args:
+            user (torch.Tensor): Sparse tensor of the user's artists.
+
+        Returns:
+            Tuple[List[int], List[float]]:
+                - List of indices of the top similar users, sorted in descending order of similarity.
+                - List of corresponding similarity values, also sorted in descending order.
+        """
+        pass
+
+    def recommend_items(self, artist_ids: torch.Tensor, topn: int = 10) -> list[int]:
+        """
+        Recommend an artist for the user based on the most similar user's preferences.
+        Args:
+            :param artist_ids: User to get recommendation for
+            :param topn: number of recommendations to make
+        Returns:
+            int: Sorted list of topn recommended artists.
+        """
+        similar_users, _ = self.get_similar_users(artist_ids)
+
+        # Extract user's existing artists
+        user_artists = set(artist_ids.indices()[1].tolist())
+
+        recommendations = []
+        for similar_user in similar_users:
+            similar_artists, _ = get_sorted_artists(similar_user, self.data)
+            new_recommendations = [idx for idx in similar_artists if idx not in user_artists]
+            recommendations.extend(new_recommendations)
+            if len(recommendations) >= topn:
+                return recommendations[:topn]
+            else:
+                user_artists |= set(new_recommendations)
+
+        raise ValueError("Unable to generate recommendations with the given inputs.")

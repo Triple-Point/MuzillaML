@@ -3,22 +3,22 @@ import os
 import torch
 import numpy as np
 
-from src.data.DataUtils import get_sorted_artists
 from src.data.TensorUtils import normalize_L1_sparse_tensor, dense_to_sparse, normalize_L2_sparse_tensor
-from src.models.recommender_model import RecommenderModel
+from src.models.recommender_model import SimilarUserRecommender
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-class TFIDFModel(RecommenderModel):
+class TFIDFModel(SimilarUserRecommender):
     def __init__(self, data, user_id_to_index_map=None, artist_id_to_index_map=None):
         super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
         self.idf_vector = None
         self.tfidf_matrix = self.compute_tfidf()
         # Normalize it row-wise, ready for the cosine similarity
         self.tfidf_matrix = normalize_L2_sparse_tensor(self.tfidf_matrix)
+        self.model_path = None
 
     def save_model(self, file_path=None):
         """Saves TF-IDF and similarity matrices to disk."""
@@ -86,32 +86,6 @@ class TFIDFModel(RecommenderModel):
 
         # Get top indices and scores sorted by similarity (descending)
         return top_indices.tolist(), top_scores  # Indices of the top_n values
-
-    def recommend_items(self, artist_ids: torch.sparse_coo_tensor, topn=10) -> list[int]:
-        """
-        Recommend top-N similar artists based on input artist IDs.
-
-        :param artist_ids: Sparse tensor representing the user's artists.
-        :param topn: Number of recommendations to return.
-        :return: List of recommended artist indices.
-        """
-        similar_users, _ = self.get_similar_users(artist_ids)
-
-        # Extract user's existing artists
-        user_artists = set(artist_ids.indices()[1].tolist())
-
-        recommendations = []
-        for similar_user in similar_users:
-            similar_artists, _ = get_sorted_artists(similar_user, self.data)
-            # TODO: Selection could be better - just picking new artists in index order
-            new_recommendations = [idx for idx in similar_artists if idx not in user_artists]
-            recommendations.extend(new_recommendations)
-            if len(recommendations) >= topn:
-                return recommendations[:topn]
-            else:
-                user_artists |= set(new_recommendations)
-
-        raise ValueError("Unable to generate recommendations with the given inputs.")
 
 
 def calculate_tfidf(users):
