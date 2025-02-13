@@ -13,7 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 
 class TFIDFModel(RecommenderModel):
-    def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
+    def __init__(self, data, user_id_to_index_map=None, artist_id_to_index_map=None):
         super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
         self.idf_vector = None
         self.tfidf_matrix = self.compute_tfidf()
@@ -68,7 +68,7 @@ class TFIDFModel(RecommenderModel):
         # Construct sparse TF-IDF matrix
         return torch.sparse_coo_tensor(indices, tfidf_values, shape, device=device).coalesce()
 
-    def get_similar_users(self, user: torch.Tensor) -> list[int]:
+    def get_similar_users(self, user: torch.Tensor) -> tuple[list[int], list[float]]:
         device = self.data.device
 
         # Normalize and ensure input tensor is on the same device
@@ -78,10 +78,14 @@ class TFIDFModel(RecommenderModel):
         tfidf_norm = normalize_L2_sparse_tensor(user_tfidf.coalesce())
 
         # Compute similarity scores (dot product with similarity matrix)
-        similarity_scores = torch.sparse.mm(self.tfidf_matrix, tfidf_norm.t()).to_dense().cpu().numpy().flatten()
+        cosine_sim = torch.sparse.mm(self.tfidf_matrix, tfidf_norm.t()).to_dense().cpu().numpy().flatten()
 
         # Get top indices and scores sorted by similarity (descending)
-        return np.argsort(similarity_scores)[::-1].tolist()  # Indices of the top_n values
+        top_indices = np.argsort(cosine_sim)[::-1]  # Indices of the top_n values
+        top_scores = cosine_sim[top_indices]  # Corresponding similarity values
+
+        # Get top indices and scores sorted by similarity (descending)
+        return top_indices.tolist(), top_scores  # Indices of the top_n values
 
     def recommend_items(self, artist_ids: torch.sparse_coo_tensor, topn=10) -> list[int]:
         """
@@ -91,7 +95,7 @@ class TFIDFModel(RecommenderModel):
         :param topn: Number of recommendations to return.
         :return: List of recommended artist indices.
         """
-        similar_users = self.get_similar_users(artist_ids)
+        similar_users, _ = self.get_similar_users(artist_ids)
 
         # Extract user's existing artists
         user_artists = set(artist_ids.indices()[1].tolist())
@@ -133,8 +137,7 @@ def test(users):
 
     # Create a sparse model
     data = dense_to_sparse(users)
-    dummy_map = {i: i for i in range(max(data.shape))}
-    model = TFIDFModel(data, dummy_map, dummy_map)
+    model = TFIDFModel(data)
 
     # Compare the model values to those calculated by the TFIDF above
     model_tfidf = model.tfidf_matrix.to_dense().cpu().detach().numpy()
