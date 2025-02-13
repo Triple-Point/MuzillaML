@@ -19,16 +19,6 @@ class CosineModel(RecommenderModel):
         # Normalize the data in prep for the cosine similarity calculation.
         self.norm_data = normalize_L2_sparse_tensor(self.data).to(self.device)
 
-    def sparse_cosine_similarity(self, norm_tensor: torch.Tensor) -> torch.Tensor:
-        """
-        Compute cosine similarity using sparse tensors.
-        Args:
-            norm_tensor (Tensor): Normalized artist_ids tensor.
-        Returns:
-            Tensor: Cosine similarity tensor.
-        """
-        return torch.sparse.mm(self.norm_data, norm_tensor.t())
-
     def get_similar_users(self, user: torch.Tensor) -> Tuple[List[int], List[float]]:
         """
         Compute the indices and similarity values of the most similar users based on cosine similarity.
@@ -42,7 +32,9 @@ class CosineModel(RecommenderModel):
                 - List of corresponding similarity values, also sorted in descending order.
         """
         # Compute cosine similarity
-        cosine_sim = self.sparse_cosine_similarity(user)
+        norm_user = normalize_L2_sparse_tensor(user).to(self.device)
+
+        cosine_sim = torch.sparse.mm(self.norm_data, norm_user.t())
         cosine_sim = cosine_sim.to_dense().cpu().numpy().flatten()
 
         # Get top indices and scores sorted by similarity (descending)
@@ -60,11 +52,10 @@ class CosineModel(RecommenderModel):
         Returns:
             int: Sorted list of topn recommended artists.
         """
-        norm_user = normalize_L1_sparse_tensor(artist_ids).to(self.device)
+        similar_users, _ = self.get_similar_users(artist_ids)
+
         # Extract user's existing artists
         user_artists = set(artist_ids.indices()[1].tolist())
-
-        similar_users, _ = self.get_similar_users(norm_user)
 
         recommendations = []
         for similar_user in similar_users:
