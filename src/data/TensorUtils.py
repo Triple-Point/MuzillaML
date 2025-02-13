@@ -148,7 +148,19 @@ def normalize_L2_sparse_tensor(sparse_tensor: torch.sparse_coo_tensor) -> torch.
     return torch.sparse.mm(norm_diagonal, sparse_tensor)
 
 
-def dense_to_sparse(dense_matrix):
+def dense_to_sparse(dense_matrix: list[list[int | float]], dtype: torch.dtype = torch.float32) -> torch.sparse_coo_tensor:
+    """
+    Convert a dense 2D list (matrix) into a PyTorch sparse COO tensor.
+
+    Args:
+        dense_matrix (List[List[Union[int, float]]]): A 2D list representing user-item interactions,
+            where rows correspond to users and columns to items (e.g., play counts).
+        dtype (torch.dtype, optional): Data type of the resulting sparse tensor. Defaults to torch.float32.
+
+    Returns:
+        torch.sparse_coo_tensor: A sparse tensor representation of the input matrix,
+            with shape (num_users, num_artists) and nonzero elements preserved.
+    """
     # Explicitly construct the indices and values for demonstration purposes
     # Expects a 2D input
     indices = [[], []]
@@ -163,7 +175,7 @@ def dense_to_sparse(dense_matrix):
                 values.append(artist_count)
             if num_artists <= column:
                 num_artists = column + 1
-    return torch.sparse_coo_tensor(indices, values, (num_users, num_artists)).coalesce()
+    return torch.sparse_coo_tensor(indices, values, (num_users, num_artists), dtype=dtype).coalesce()
 
 
 if __name__ == "__main__":
