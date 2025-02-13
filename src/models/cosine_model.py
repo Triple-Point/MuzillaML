@@ -1,9 +1,8 @@
-from typing import List, Tuple
 import numpy as np
 import torch
 import logging
 
-from src.data.TensorUtils import normalize_L1_sparse_tensor, normalize_L2_sparse_tensor
+from src.data.TensorUtils import normalize_L2_sparse_tensor
 from src.data.DataUtils import get_sorted_artists
 from src.models.recommender_model import RecommenderModel
 
@@ -19,7 +18,7 @@ class CosineModel(RecommenderModel):
         # Normalize the data in prep for the cosine similarity calculation.
         self.norm_data = normalize_L2_sparse_tensor(self.data).to(self.device)
 
-    def get_similar_users(self, user: torch.Tensor) -> Tuple[List[int], List[float]]:
+    def get_similar_users(self, user: torch.Tensor) -> tuple[list[int], list[float]]:
         """
         Compute the indices and similarity values of the most similar users based on cosine similarity.
 
@@ -43,7 +42,7 @@ class CosineModel(RecommenderModel):
 
         return top_indices.tolist(), top_scores.tolist()
 
-    def recommend_items(self, artist_ids: torch.Tensor, topn: int = 10) -> List[int]:
+    def recommend_items(self, artist_ids: torch.Tensor, topn: int = 10) -> list[int]:
         """
         Recommend an artist for the user based on the most similar user's preferences.
         Args:
