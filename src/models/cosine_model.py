@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class CosineModel(SimilarUserRecommender):
-    def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
+    def __init__(self, data, user_id_to_index_map=None, artist_id_to_index_map=None):
         super().__init__(data, user_id_to_index_map, artist_id_to_index_map)
         self.device = getattr(data, "device", torch.device("cpu"))
         # Normalize the data in prep for the cosine similarity calculation.
