@@ -70,6 +70,20 @@ def remove_random_values(user_tensor: torch.sparse_coo_tensor, num_remove: int =
 
 
 def get_sorted_artists(user_id: int, sparse_tensor: torch.sparse_coo_tensor) -> tuple[list[int], list[float]]:
+    """
+    Retrieve and sort the artists for a given user based on interaction strength from a sparse tensor.
+
+    Args:
+        user_id (int): The user ID for which to retrieve artist interactions.
+        sparse_tensor (torch.sparse_coo_tensor): A sparse tensor where:
+            - The first row of indices represents user IDs.
+            - The second row of indices represents artist IDs.
+            - The values represent interaction strengths (e.g., play counts).
+
+    Returns:
+        - A list of artist IDs sorted by artist counts in descending order.
+        - A list of corresponding artist counts
+    """
     # Extract the indices and values from the sparse tensor for the given user ID
     indices = sparse_tensor.indices()
     values = sparse_tensor.values()
@@ -88,7 +102,7 @@ def get_sorted_artists(user_id: int, sparse_tensor: torch.sparse_coo_tensor) -> 
     sorted_artists = user_artist_indices[sorted_indices]
     sorted_values = user_artist_values[sorted_indices]
 
-    return sorted_artists, sorted_values
+    return sorted_artists.tolist(), sorted_values.tolist()
 
 
 if __name__ == "__main__":
