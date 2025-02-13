@@ -167,6 +167,6 @@ def dense_to_sparse(dense_matrix):
 
 
 if __name__ == "__main__":
-    un_norm = dense_to_sparse([[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3]])
-    norm = normalize_L1_sparse_tensor(un_norm).to_dense()
-    logger.info(norm)
+    un_norm = dense_to_sparse([[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3], [2, 4, 6, 8, 10]])
+    logger.info(normalize_L1_sparse_tensor(un_norm).to_dense())
+    logger.info(normalize_L2_sparse_tensor(un_norm).to_dense())
