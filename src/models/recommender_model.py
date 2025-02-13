@@ -14,12 +14,14 @@ logger = logging.getLogger(__name__)
 # TODO: Save the model, and ensure it can be loaded without the overhead of the data. Probably should be abstract.
 
 class RecommenderModel(ABC):
-    def __init__(self, data, user_id_to_index_map, artist_id_to_index_map):
+    def __init__(self, data, user_id_to_index_map=None, artist_id_to_index_map=None):
         self.data = data
         self.user_id_to_index_map = user_id_to_index_map
         self.artist_id_to_index_map = artist_id_to_index_map
-        self.artist_index_to_id_map = {index: id_ for id_, index in artist_id_to_index_map.items()}
-        self.num_artists = len(self.artist_index_to_id_map)
+        self.artist_index_to_id_map = {index: id_ for id_, index in artist_id_to_index_map.items()} \
+            if artist_id_to_index_map else None
+        self.num_users = data.size(0)
+        self.num_artists = data.size(1)
 
     @classmethod
     def from_files(cls, raw_data_filename: str, sparse_data_filename: str, force_reprocess: bool = False):
@@ -117,7 +119,7 @@ class RecommenderModel(ABC):
         if excluded_artists is None:
             excluded_artists = []
         # Map to the model IDs
-        artists = [self.artist_id_to_index_map[i] for i in artist_ids]
+        artists = [self.artist_id_to_index_map[i] for i in artist_ids] if self.artist_id_to_index_map else artist_ids
         # User is one-d so use 0 for their index internally
         indices = [[0] * len(artists), artists]
         if album_counts:
@@ -127,6 +129,6 @@ class RecommenderModel(ABC):
         user_tensor = torch.sparse_coo_tensor(indices, values, size=(1, self.num_artists),
                                               dtype=torch.float64).coalesce()
         recommendations = self.recommend_items(user_tensor, topn + len(excluded_artists))
-        recommended_ids = [self.artist_index_to_id_map[r] for r in recommendations]
+        recommended_ids = [self.artist_index_to_id_map[r] for r in recommendations] if self.artist_index_to_id_map else recommendations
         artist_list = [r for r in recommended_ids if r not in excluded_artists]
         return artist_list[:topn]
